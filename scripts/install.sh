@@ -118,15 +118,18 @@ stage() {
 }
 
 cmdline() {  # $1 = mode (dt|acpi), $2 = root uuid
-  local mode=$1 uuid=$2 c nc=""
-  c="root=UUID=$uuid ro rootwait panic=10 sky1test=$mode ignore_loglevel printk.devkmsg=on clk_ignore_unused efi=noruntime"
+  local mode=$1 uuid=$2 c nc="" panic=10 early=""
+  # SCREEN=1 (someone at the monitor): print from the very first instruction on the EFI
+  # framebuffer and stop on a panic instead of rebooting, so the message stays on screen.
+  if [ "${SCREEN:-0}" = 1 ]; then panic=0; early=" earlycon=efifb keep_bootcon"; fi
+  c="root=UUID=$uuid ro rootwait panic=$panic sky1test=$mode ignore_loglevel printk.devkmsg=on clk_ignore_unused efi=noruntime$early"
   if [ -f "$NETCON_CONF" ]; then
     # shellcheck disable=SC1090
     . "$NETCON_CONF"
     nc=" netpoll.carrier_timeout=15 netconsole=+6665@$LOCAL_IP/$LOCAL_MAC,6666@$REMOTE_IP/$REMOTE_MAC"
   fi
   case "$mode" in
-    dt)   c="$c acpi=off earlycon console=ttyAMA2,115200" ;;
+    dt)   [ -n "$early" ] || c="$c earlycon"; c="$c acpi=off console=ttyAMA2,115200" ;;
     acpi) c="$c acpi=force arm-smmu-v3.disable_bypass=0" ;;
     *) die "mode must be dt or acpi" ;;
   esac
