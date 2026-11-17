@@ -24,21 +24,24 @@ There is no upstream or Sky1-Linux DTS for the non-Plus Orange Pi 6. `dts/sky1-o
 
 ## Steps
 ```bash
-export WORK=$HOME/sky1-build
-scripts/01-toolchain.sh      # unprivileged toolchain from Ubuntu debs
-scripts/02-fetch-patch.sh    # kernel.org + signature check + Sky1 patches + our DTS
-scripts/03-build.sh          # Image, modules, dtbs (-j6; -j12 crashed the board once)
-sudo WORK=$WORK bash scripts/install.sh   # kernel, initramfs, GRUB entry, one-shot boot
+export WORK=$HOME/sky1-build           # must not be inside a git repo (kernel would become "6.18.14-sky1+")
+scripts/01-toolchain.sh                # unprivileged toolchain from Ubuntu debs
+scripts/02-fetch-patch.sh              # kernel.org + signature check + Sky1 patches + our DTS; checks release name
+scripts/03-build.sh                    # Image, modules, dtbs (-j6; -j12 crashed the board once)
+sudo WORK=$WORK scripts/install.sh stage    # modules, /boot/sky1/{vmlinuz,initrd.img,dtb}; then runs verify
+sudo WORK=$WORK scripts/install.sh arm      # GRUB entry as the LAST entry + one-shot grub-reboot
 sudo reboot
-# after the test boot:
+# after the test boot (or after falling back to Armbian):
 cat /var/log/sky1-boot-report.txt
 scripts/gpu-test.sh
+sudo scripts/install.sh disarm         # remove the entry again
 ```
+`verify` fails loudly if anything is missing or mismatched: the module tree for the exact kernel release, panthor/r8125 vermagic, built-in nvme/ext4/PCIe/ramoops, the kernel and DTB in `/boot/sky1` matching the build, the DTB model being "Orange Pi 6" with the unused PCIe ports disabled, the initrd holding the module tree, and the Mali firmware. `arm` checks the generated grub.cfg with `grub-script-check`, confirms entry 0 is still Armbian and that the test entry appears exactly once, and only then installs it.
 
 ## Safety
-- Armbian stays the GRUB default (`GRUB_DEFAULT=0`). `install.sh` only arms a one-shot `grub-reboot` into "Sky1 GPU test", so any reset after a failed test boot lands back on Armbian.
-- `sky1-boot-report.service` runs only when `acpi=off` is on the command line. It logs the GPU state, and reboots back to Armbian if there's no network within 180 s.
-- `panic=10` reboots on a kernel panic.
+- Kernel, initrd and DTB live in `/boot/sky1/`, so Armbian's `10_linux` never makes entries for them. The test entry comes from `/etc/grub.d/45_sky1`, after `10_linux`, so entry 0 (`GRUB_DEFAULT=0`) stays Armbian. `grub-reboot` arms exactly one boot.
+- If the test kernel hangs, a power cycle boots Armbian. If it panics, `panic=10` reboots into Armbian. If it boots but has no network, `sky1-boot-report.service` reboots into Armbian after 180 s.
+- `CONFIG_PSTORE_RAM=y` and `PSTORE_CONSOLE=y` keep the last kernel log in RAM (ramoops) across a warm reboot, for diagnosis.
 
 ## Known issues (from Sky1-Linux / visorcraft)
 - GPU temperature sensors don't read.

@@ -4,6 +4,7 @@ set -euo pipefail
 WORK=${WORK:-$HOME/sky1-build}; P=$WORK/tc
 mkdir -p "$WORK/debs" "$P/rtlib"; cd "$WORK/debs"
 PK=$(apt-get install -s --no-install-recommends gcc make flex bison libssl-dev libelf-dev bc cpio kmod xz-utils zstd 2>/dev/null | awk '/^Inst/{print $2}')
+# shellcheck disable=SC2086  # word splitting intended: list of package names
 [ -n "$PK" ] && apt-get download $PK
 for d in *.deb; do dpkg -x "$d" "$P"; done
 ln -sfn usr/lib "$P/lib"; ln -sfn usr/bin "$P/bin"

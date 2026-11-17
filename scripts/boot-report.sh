@@ -11,7 +11,7 @@ OUT=/var/log/sky1-boot-report.txt
 } > "$OUT" 2>&1
 chmod 644 "$OUT"
 for i in $(seq 1 36); do
-  if ip -4 route show default | grep -q .; then
+  if [ -n "$(ip -4 route show default)" ]; then
     { echo "== network up after $((i*5))s"; ip -br link; } >> "$OUT"; exit 0
   fi
   sleep 5
