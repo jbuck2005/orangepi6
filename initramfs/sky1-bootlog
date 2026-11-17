@@ -1,0 +1,62 @@
+#!/bin/sh
+# Boot logger for the Sky1 test kernel. POSIX sh (runs under busybox in the initramfs).
+#   start : dump dmesg to a preallocated raw disk area every 2 s; set up netconsole if the
+#           boot-time target did not come up
+#   final : one last dump, stop the loop
+#   dump  : one dump (also used by the self-test on Armbian)
+# The raw area is a zero-filled file on the root fs whose physical location was proven at
+# install time by writing through the filesystem and reading the raw device (see install.sh).
+CONF=${SKY1_BOOTLOG_CONF:-/etc/sky1-bootlog.conf}
+NCONF=${SKY1_NETCONSOLE_CONF:-/etc/sky1-netconsole.conf}
+PIDF=${SKY1_BOOTLOG_PID:-/run/sky1-bootlog.pid}
+DMESG=${SKY1_DMESG:-dmesg}
+[ -f "$CONF" ] || exit 0
+# shellcheck disable=SC1090
+. "$CONF"   # DEV OFFSET SIZE
+: "${DEV:?}" "${OFFSET:?}" "${SIZE:?}"
+
+dump() {
+  [ -b "$DEV" ] || [ -f "$DEV" ] || return 1
+  t=${SKY1_TMP:-/run/sky1-bootlog.tmp}
+  { echo "SKY1BOOTLOG $1 uptime=$(cut -d' ' -f1 /proc/uptime)"; cat /proc/cmdline; $DMESG 2>&1; echo "SKY1BOOTLOG-END"; } > "$t"
+  # truncate to SIZE, pad with zeros to whole 4 KiB blocks
+  dd if="$t" of="$DEV" bs=4096 count=$((SIZE / 4096)) seek=$((OFFSET / 4096)) conv=notrunc,sync,fsync 2>/dev/null
+}
+
+netcon() {
+  [ -f "$NCONF" ] || return 0
+  # shellcheck disable=SC1090
+  . "$NCONF"   # REMOTE_IP REMOTE_MAC LOCAL_IP LOCAL_MAC
+  grep -q 'netconsole: network logging started' /dev/kmsg 2>/dev/null && return 0
+  $DMESG | grep -q 'network logging started' && return 0
+  C=/sys/kernel/config/netconsole
+  [ -d "$C" ] || mount -t configfs none /sys/kernel/config 2>/dev/null
+  [ -d "$C" ] || return 0
+  for n in /sys/class/net/*; do
+    [ "$(cat "$n/address" 2>/dev/null)" = "$LOCAL_MAC" ] || continue
+    i=${n##*/}
+    ip link set "$i" up 2>/dev/null
+    k=0; while [ "$(cat "$n/carrier" 2>/dev/null)" != 1 ] && [ $k -lt 20 ]; do sleep 1; k=$((k+1)); done
+    mkdir -p "$C/initrd" || return 0
+    echo "$i" > "$C/initrd/dev_name"; echo "$LOCAL_IP" > "$C/initrd/local_ip"
+    echo "$REMOTE_IP" > "$C/initrd/remote_ip"; echo "$REMOTE_MAC" > "$C/initrd/remote_mac"
+    echo 6666 > "$C/initrd/remote_port"; echo 1 > "$C/initrd/enabled" || return 0
+    # replay the boot log so the receiver also gets everything before this point
+    $DMESG | while IFS= read -r l; do echo "<6>replay: $l" > /dev/kmsg; done
+    return 0
+  done
+}
+
+case "${1:-}" in
+  dump) dump manual ;;
+  start)
+    echo $$ > "$PIDF"
+    k=0; while [ ! -b "$DEV" ] && [ $k -lt 60 ]; do sleep 1; k=$((k+1)); done
+    dump start
+    netcon &
+    while :; do sleep 2; dump loop; done ;;
+  final)
+    [ -f "$PIDF" ] && kill "$(cat "$PIDF")" 2>/dev/null
+    dump final ;;
+esac
+exit 0
