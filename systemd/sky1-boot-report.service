@@ -1,0 +1,11 @@
+[Unit]
+Description=Sky1 DT test boot report and network fallback
+ConditionKernelCommandLine=acpi=off
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sky1-boot-report
+
+[Install]
+WantedBy=multi-user.target
