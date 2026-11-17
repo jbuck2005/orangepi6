@@ -14,8 +14,10 @@ TAG="sky1-netconsole-selftest-$(date +%s)"
 modprobe netconsole netconsole="+6665@$LOCAL_IP/$LOCAL_MAC,6666@$REMOTE_IP/$REMOTE_MAC"
 trap 'rmmod netconsole 2>/dev/null || true' EXIT
 sleep 2
-dmesg | grep -q 'netconsole: network logging started' || { echo "FAIL: netconsole did not start:" >&2; dmesg | grep -i netcon | tail -5 >&2; exit 1; }
-echo "<6>$TAG" > /dev/kmsg
+K=$(dmesg)
+grep -q 'netconsole: network logging started' <<<"$K" || { echo "FAIL: netconsole did not start:" >&2; grep -i netcon <<<"$K" | tail -5 >&2; exit 1; }
+# console_loglevel is often 4 on a normal boot, so send at KERN_ERR (3) to pass the console filter
+echo "<3>$TAG" > /dev/kmsg
 sleep 1
 echo "  ok: netconsole started and sent tag $TAG"
 echo "  check the log host for that tag"
