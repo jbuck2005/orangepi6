@@ -142,6 +142,8 @@ write_snippet() {  # $1 = output file, $2 = mode
 #!/bin/sh
 cat <<'MENU'
 menuentry "$entry" {
+    set sky1_picked="$entry"
+    save_env sky1_picked
     search --no-floppy --fs-uuid --set=root $uuid
     linux $BOOTDIR/vmlinuz $(cmdline "$2" "$uuid")
     initrd $BOOTDIR/initrd.img
@@ -162,6 +164,7 @@ check_grub_cfg() {  # $1 = grub.cfg to check, $2 = mode
   [ "$(grep -c "menuentry \"$ENTRY_PREFIX" "$cfg")" -eq 1 ] || die "more than one test entry"
   grep -qE '^GRUB_DEFAULT=0$' /etc/default/grub || die "GRUB_DEFAULT is not 0"
   grep -q 'next_entry' "$cfg" || die "grub.cfg lacks next_entry (no one-shot support)"
+  grep -A3 "menuentry \"$entry\"" "$cfg" | grep -q 'save_env sky1_picked' || die "test entry lacks the sky1_picked marker"
   ! grep -E "^menuentry 'Armbian.*sky1" "$cfg" >/dev/null || die "10_linux generated Armbian entries for the sky1 kernel"
   if [ "$2" = dt ]; then
     grep -A6 "menuentry \"$entry\"" "$cfg" | grep -q "devicetree $BOOTDIR/$DTB_NAME" || die "dt entry lacks devicetree line"
@@ -190,9 +193,11 @@ arm() {  # $1 = mode
   ( check_grub_cfg "$tmpcfg" "$mode" ) || { rm -f "$GRUB_SNIPPET" "$tmpcfg"; die "generated grub.cfg rejected; nothing installed"; }
   install -m644 "$tmpcfg" /boot/grub/grub.cfg; rm -f "$tmpcfg"
   check_grub_cfg /boot/grub/grub.cfg "$mode"
+  grub-editenv - unset sky1_picked
   grub-reboot "$ENTRY_PREFIX ($mode)"
   local E; E=$(grub-editenv list)
   grep -qx "next_entry=$ENTRY_PREFIX ($mode)" <<<"$E" || die "next_entry not set"
+  ! grep -q '^sky1_picked=' <<<"$E" || die "sky1_picked marker not cleared"
   grep -A6 "menuentry \"$ENTRY_PREFIX ($mode)\"" /boot/grub/grub.cfg | sed 's/^/    /'
   ok "armed for ONE boot; afterwards GRUB falls back to entry 0 (Armbian)"
 }
@@ -217,6 +222,8 @@ case "${1:-}" in
   verify) load_build; verify ;;
   arm) arm "${2:-}" ;;
   disarm) disarm ;;
-  bootlog) "$REPO/scripts/bootlog-area.sh" read "$BOOTLOG_CONF" ;;
+  bootlog)
+    echo "== GRUB marker: $(grub-editenv list | grep '^sky1_picked=' || echo 'not set: GRUB has not booted the test entry since arming')"
+    "$REPO/scripts/bootlog-area.sh" read "$BOOTLOG_CONF" ;;
   *) echo "usage: $0 stage|verify|arm dt|arm acpi|disarm|bootlog"; exit 2 ;;
 esac
