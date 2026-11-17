@@ -137,17 +137,28 @@ write_snippet() {  # $1 = output file, $2 = mode
   local uuid entry dtline=""
   uuid=$(findmnt -no UUID /); [ -n "$uuid" ] || die "no root UUID"
   entry="$ENTRY_PREFIX ($2)"
-  [ "$2" = dt ] && dtline="    devicetree $BOOTDIR/$DTB_NAME"
+  # sky1_stage records the last GRUB step reached, so a failure that falls back to Armbian
+  # (hidden menu, timeout 0) still says where it failed. "boot_returned" = kernel was started
+  # but its EFI stub returned to GRUB.
+  [ "$2" = dt ] && dtline="    if devicetree $BOOTDIR/$DTB_NAME; then set sky1_stage=dtb_ok; else set sky1_stage=dtb_failed; fi
+    save_env sky1_stage"
   cat > "$1" <<GRUB
 #!/bin/sh
 cat <<'MENU'
 menuentry "$entry" {
     set sky1_picked="$entry"
-    save_env sky1_picked
-    search --no-floppy --fs-uuid --set=root $uuid
-    linux $BOOTDIR/vmlinuz $(cmdline "$2" "$uuid")
-    initrd $BOOTDIR/initrd.img
+    set sky1_stage=picked
+    save_env sky1_picked sky1_stage
+    if search --no-floppy --fs-uuid --set=root $uuid; then set sky1_stage=search_ok; else set sky1_stage=search_failed; fi
+    save_env sky1_stage
+    if linux $BOOTDIR/vmlinuz $(cmdline "$2" "$uuid"); then set sky1_stage=linux_ok; else set sky1_stage=linux_failed; fi
+    save_env sky1_stage
+    if initrd $BOOTDIR/initrd.img; then set sky1_stage=initrd_ok; else set sky1_stage=initrd_failed; fi
+    save_env sky1_stage
 $dtline
+    boot
+    set sky1_stage=boot_returned
+    save_env sky1_stage
 }
 MENU
 GRUB
@@ -167,8 +178,8 @@ check_grub_cfg() {  # $1 = grub.cfg to check, $2 = mode
   grep -A3 "menuentry \"$entry\"" "$cfg" | grep -q 'save_env sky1_picked' || die "test entry lacks the sky1_picked marker"
   ! grep -E "^menuentry 'Armbian.*sky1" "$cfg" >/dev/null || die "10_linux generated Armbian entries for the sky1 kernel"
   if [ "$2" = dt ]; then
-    grep -A6 "menuentry \"$entry\"" "$cfg" | grep -q "devicetree $BOOTDIR/$DTB_NAME" || die "dt entry lacks devicetree line"
-    grep -A6 "menuentry \"$entry\"" "$cfg" | grep -q 'acpi=off' || die "dt entry lacks acpi=off"
+    grep -A20 "menuentry \"$entry\"" "$cfg" | grep -q "devicetree $BOOTDIR/$DTB_NAME" || die "dt entry lacks devicetree line"
+    grep -A20 "menuentry \"$entry\"" "$cfg" | grep -q 'acpi=off' || die "dt entry lacks acpi=off"
   fi
   ok "grub.cfg: Armbian is entry 0, one test entry ($2), syntax OK"
 }
@@ -193,12 +204,12 @@ arm() {  # $1 = mode
   ( check_grub_cfg "$tmpcfg" "$mode" ) || { rm -f "$GRUB_SNIPPET" "$tmpcfg"; die "generated grub.cfg rejected; nothing installed"; }
   install -m644 "$tmpcfg" /boot/grub/grub.cfg; rm -f "$tmpcfg"
   check_grub_cfg /boot/grub/grub.cfg "$mode"
-  grub-editenv - unset sky1_picked
+  grub-editenv - unset sky1_picked sky1_stage
   grub-reboot "$ENTRY_PREFIX ($mode)"
   local E; E=$(grub-editenv list)
   grep -qx "next_entry=$ENTRY_PREFIX ($mode)" <<<"$E" || die "next_entry not set"
-  ! grep -q '^sky1_picked=' <<<"$E" || die "sky1_picked marker not cleared"
-  grep -A6 "menuentry \"$ENTRY_PREFIX ($mode)\"" /boot/grub/grub.cfg | sed 's/^/    /'
+  ! grep -qE '^sky1_(picked|stage)=' <<<"$E" || die "sky1_picked/sky1_stage markers not cleared"
+  grep -A20 "menuentry \"$ENTRY_PREFIX ($mode)\"" /boot/grub/grub.cfg | sed 's/^/    /'
   ok "armed for ONE boot; afterwards GRUB falls back to entry 0 (Armbian)"
 }
 
@@ -223,7 +234,8 @@ case "${1:-}" in
   arm) arm "${2:-}" ;;
   disarm) disarm ;;
   bootlog)
-    echo "== GRUB marker: $(grub-editenv list | grep '^sky1_picked=' || echo 'not set: GRUB has not booted the test entry since arming')"
+    echo "== GRUB markers: $(grub-editenv list | grep -E '^sky1_(picked|stage)=' | tr '\n' ' ' || true)"
+    grub-editenv list | grep -q '^sky1_picked=' || echo "   (none: GRUB has not booted the test entry since arming)"
     "$REPO/scripts/bootlog-area.sh" read "$BOOTLOG_CONF" ;;
   *) echo "usage: $0 stage|verify|arm dt|arm acpi|disarm|bootlog"; exit 2 ;;
 esac
