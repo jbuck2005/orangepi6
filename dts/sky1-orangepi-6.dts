@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * Orange Pi 6 (non-Plus, 90x90 mm, 2x RTL8125).
+ *
+ * Derived from sky1-orangepi-6-plus.dts. PCIe wiring was checked against this
+ * board's own ACPI DSDT/SSDT (firmware OPI6BiosV0.8):
+ *   PRC0 0x0a010000 (pcie_x8_rc)   reset S5 GPIO0 1, supply S5 GPIO0 8  -> NVMe (x4 link)
+ *   PRC2 0x0a0c0000 (pcie_x2_rc)   reset S5 GPIO0 2                     -> RTL8125
+ *   PRC3 0x0a0e0000 (pcie_x1_1_rc) reset S5 GPIO0 5                     -> RTL8125
+ *   PRC1 0x0a070000 (pcie_x4_rc) and PRC4 0x0a0d0000 (pcie_x1_0_rc) are
+ *   disabled by firmware on this board, so they are disabled here too.
+ * Display chain of the Plus (PS185 DP->HDMI bridge, eDP panel, backlight) is
+ * disabled: this board is run headless and its display wiring is unverified.
+ */
+
+#include "sky1-orangepi-6-plus.dts"
+
+/ {
+	model = "Orange Pi 6";
+	compatible = "xunlong,orangepi-6", "cix,sky1";
+};
+
+&pcie_x4_rc { status = "disabled"; };
+&pcie_x1_0_rc { status = "disabled"; };
+&vdd_1v8_pcie_x4_rc { status = "disabled"; };
+&vdd_1v8_pcie_x1_0_rc { status = "disabled"; };
+
+&ps185 { status = "disabled"; };
+&ps185_pdb { status = "disabled"; };
+&hdmi_connector { status = "disabled"; };
+&panel_edp0 { status = "disabled"; };
+&dp2_backlight { status = "disabled"; };
