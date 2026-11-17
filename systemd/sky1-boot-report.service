@@ -1,6 +1,6 @@
 [Unit]
 Description=Sky1 DT test boot report and network fallback
-ConditionKernelCommandLine=acpi=off
+ConditionKernelCommandLine=sky1test
 After=network.target
 
 [Service]

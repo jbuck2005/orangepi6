@@ -28,20 +28,30 @@ export WORK=$HOME/sky1-build           # must not be inside a git repo (kernel w
 scripts/01-toolchain.sh                # unprivileged toolchain from Ubuntu debs
 scripts/02-fetch-patch.sh              # kernel.org + signature check + Sky1 patches + our DTS; checks release name
 scripts/03-build.sh                    # Image, modules, dtbs (-j6; -j12 crashed the board once)
-sudo WORK=$WORK scripts/install.sh stage    # modules, /boot/sky1/{vmlinuz,initrd.img,dtb}; then runs verify
-sudo WORK=$WORK scripts/install.sh arm      # GRUB entry as the LAST entry + one-shot grub-reboot
+# optional netconsole target: $WORK/netconsole.conf with REMOTE_IP REMOTE_MAC LOCAL_IP LOCAL_MAC (not committed)
+sudo WORK=$WORK scripts/install.sh stage      # modules, /boot/sky1/*, boot logger, initramfs; then verify
+sudo WORK=$WORK scripts/install.sh arm acpi   # diagnostic: same kernel, ACPI mode (no GPU)
+sudo WORK=$WORK scripts/install.sh arm dt     # device tree + acpi=off (GPU)
 sudo reboot
-# after the test boot (or after falling back to Armbian):
-cat /var/log/sky1-boot-report.txt
+# afterwards (whichever kernel came up):
+sudo scripts/install.sh bootlog        # raw boot log written by the test boot's initramfs
+cat /var/log/sky1-boot-report.txt      # only if the test boot reached userspace
 scripts/gpu-test.sh
-sudo scripts/install.sh disarm         # remove the entry again
+sudo scripts/install.sh disarm
 ```
-`verify` fails loudly if anything is missing or mismatched: the module tree for the exact kernel release, panthor/r8125 vermagic, built-in nvme/ext4/PCIe/ramoops, the kernel and DTB in `/boot/sky1` matching the build, the DTB model being "Orange Pi 6" with the unused PCIe ports disabled, the initrd holding the module tree, and the Mali firmware. `arm` checks the generated grub.cfg with `grub-script-check`, confirms entry 0 is still Armbian and that the test entry appears exactly once, and only then installs it.
+
+## Boot logging (no monitor needed)
+- **Raw disk log:** `stage` creates an 8 MiB single-extent file, `/var/lib/sky1/bootlog.bin`. It proves the file's physical location by writing a random pattern through the filesystem and reading it back from the raw disk. The test initramfs then writes the full kernel log there every 2 s with `dd`, before any filesystem is mounted, and once more just before switching to the real root.
+- **netconsole:** built in, with the NIC driver built in. The kernel command line targets the log host and replays the whole log from boot. If that target doesn't come up in time, the initramfs adds one through configfs and replays the log. Receive it with `tools/netconsole-listener.py` on the log host, and prove the path first with `tools/netconsole-selftest.sh`.
+- **ramoops/pstore:** built in, with a console record, for warm reboots.
+- `ignore_loglevel`, `printk.devkmsg=on`, and in DT mode `earlycon` plus a serial console on ttyAMA2 for when a USB serial adapter is attached.
+- The logger lives only in a private initramfs confdir, `/etc/sky1/initramfs-tools`, and is also guarded by kernel version, so Armbian's initramfs never includes it.
+
+`verify` fails loudly if anything is missing or mismatched: the module tree for the exact release, panthor vermagic, the built-in boot and network drivers, the kernel and DTB in `/boot/sky1` matching the build, the DTB model and disabled PCIe ports, the initrd holding the modules, the logger, its config and its ORDER entries, a fresh raw-location proof of the log area, and the Mali firmware. `arm` builds grub.cfg into a temp file, then checks it: `grub-script-check`, Armbian is entry 0, exactly one test entry, and for DT the `devicetree` line and `acpi=off`. Only then does it install the file and arm a one-shot `grub-reboot`.
 
 ## Safety
 - Kernel, initrd and DTB live in `/boot/sky1/`, so Armbian's `10_linux` never makes entries for them. The test entry comes from `/etc/grub.d/45_sky1`, after `10_linux`, so entry 0 (`GRUB_DEFAULT=0`) stays Armbian. `grub-reboot` arms exactly one boot.
 - If the test kernel hangs, a power cycle boots Armbian. If it panics, `panic=10` reboots into Armbian. If it boots but has no network, `sky1-boot-report.service` reboots into Armbian after 180 s.
-- `CONFIG_PSTORE_RAM=y` and `PSTORE_CONSOLE=y` keep the last kernel log in RAM (ramoops) across a warm reboot, for diagnosis.
 
 ## Known issues (from Sky1-Linux / visorcraft)
 - GPU temperature sensors don't read.

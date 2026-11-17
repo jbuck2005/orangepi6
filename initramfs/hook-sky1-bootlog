@@ -1,0 +1,20 @@
+#!/bin/sh
+# initramfs-tools hook, installed only in the private confdir /etc/sky1/initramfs-tools
+# (used with mkinitramfs -d), so Armbian's own initramfs builds never run it.
+# Also guarded by kernel version. The init-top/init-bottom scripts live in that confdir's
+# scripts/ directory (mkinitramfs only orders scripts found in the confdir). SKY1_ROOT is a test hook for an alternate source root.
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case "$1" in prereqs) prereqs; exit 0 ;; esac
+# shellcheck disable=SC1091
+. /usr/share/initramfs-tools/hook-functions
+R=${SKY1_ROOT:-}
+[ -f "$R/boot/sky1/kernel.release" ] || exit 0
+# shellcheck disable=SC2154  # $version and $DESTDIR are set by mkinitramfs
+[ "$version" = "$(cat "$R/boot/sky1/kernel.release")" ] || exit 0
+[ -f "$R/etc/sky1-bootlog.conf" ] || { echo "sky1-bootlog: $R/etc/sky1-bootlog.conf missing" >&2; exit 1; }
+mkdir -p "$DESTDIR/etc"
+cp "$R/etc/sky1-bootlog.conf" "$DESTDIR/etc/sky1-bootlog.conf"
+if [ -f "$R/etc/sky1-netconsole.conf" ]; then cp "$R/etc/sky1-netconsole.conf" "$DESTDIR/etc/sky1-netconsole.conf"; fi
+copy_exec "$R/usr/sbin/sky1-bootlog" /bin/sky1-bootlog
+exit 0

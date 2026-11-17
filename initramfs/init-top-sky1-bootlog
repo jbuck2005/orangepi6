@@ -1,0 +1,8 @@
+#!/bin/sh
+# Start boot logging as early as possible in the initramfs (Sky1 test kernel only).
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case "$1" in prereqs) prereqs; exit 0 ;; esac
+[ -x /bin/sky1-bootlog ] || exit 0
+/bin/sky1-bootlog start &
+exit 0

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Runs only on the device-tree test boot (acpi=off). Records GPU state, and reboots
+# Runs only on a Sky1 test boot (sky1test= on the command line). Records GPU state, and reboots
 # back to Armbian (GRUB default) if the network never comes up, so a headless box recovers.
 OUT=/var/log/sky1-boot-report.txt
 {
