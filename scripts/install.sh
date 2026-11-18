@@ -83,6 +83,16 @@ verify() {
   grep -q '^/scripts/init-top/sky1-bootlog ' "$IR/scripts/init-top/ORDER" || { rm -rf "$T"; die "init-top ORDER does not run sky1-bootlog"; }
   grep -q '^/scripts/init-bottom/sky1-bootlog ' "$IR/scripts/init-bottom/ORDER" || { rm -rf "$T"; die "init-bottom ORDER does not run sky1-bootlog"; }
   cmp -s "$IR/etc/sky1-bootlog.conf" "$BOOTLOG_CONF" || { rm -rf "$T"; die "initrd boot-log config differs from $BOOTLOG_CONF"; }
+  # Nothing in the initrd may come from the build tree, and every dynamic program must find
+  # all its libraries inside the initrd (checked with the initrd's own loader, chrooted).
+  ! grep -q '^home/' <<<"$L" || { rm -rf "$T"; die "initrd contains files from /home (build env leaked into mkinitramfs)"; }
+  local b missing=""
+  for b in usr/sbin/modprobe usr/lib/systemd/systemd-udevd usr/bin/udevadm usr/bin/kmod; do
+    [ -e "$IR/$b" ] || continue
+    if ! chroot "$IR" /"$b" --version >/dev/null 2>&1; then missing="$missing /$b"; fi
+  done
+  [ -z "$missing" ] || { rm -rf "$T"; die "initrd programs cannot run inside the initrd:$missing"; }
+  ok "initrd programs (modprobe, udevd, udevadm) run inside the initrd, nothing from /home"
   # Run the initrd's own logger with the initrd's own tools (klibc dd etc.) against a scratch
   # file, so a tool incompatibility shows up here and not as an empty log after a test boot.
   local S; S=$(mktemp -d)
@@ -123,7 +133,11 @@ stage() {
   install -D -m755 "$REPO/initramfs/hook-sky1-bootlog" "$CONFDIR/hooks/sky1-bootlog"
   install -D -m755 "$REPO/initramfs/init-top-sky1-bootlog" "$CONFDIR/scripts/init-top/sky1-bootlog"
   install -D -m755 "$REPO/initramfs/init-bottom-sky1-bootlog" "$CONFDIR/scripts/init-bottom/sky1-bootlog"
-  mkinitramfs -d "$CONFDIR" -o "$BOOTDIR/initrd.img" "$KREL" 2> >(grep -v 'Kernel configuration /boot/config-' >&2)
+  # Clean environment: env.sh exports LD_LIBRARY_PATH=<toolchain>/rtlib, and copy_exec follows
+  # it, which put libcrypto.so.3 under /home/.../tc/rtlib in the initrd (modprobe and udevd
+  # then fail at boot). mkinitramfs must resolve libraries exactly as the booted system will.
+  env -u LD_LIBRARY_PATH -u CC -u HOSTCC PATH=/usr/sbin:/usr/bin:/sbin:/bin \
+    mkinitramfs -d "$CONFDIR" -o "$BOOTDIR/initrd.img" "$KREL" 2> >(grep -v 'Kernel configuration /boot/config-' >&2)
   install -m755 "$REPO/scripts/boot-report.sh" /usr/local/sbin/sky1-boot-report
   install -m644 "$REPO/systemd/sky1-boot-report.service" /etc/systemd/system/
   systemctl daemon-reload; systemctl enable -q sky1-boot-report.service
