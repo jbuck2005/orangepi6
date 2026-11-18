@@ -83,6 +83,19 @@ verify() {
   grep -q '^/scripts/init-top/sky1-bootlog ' "$IR/scripts/init-top/ORDER" || { rm -rf "$T"; die "init-top ORDER does not run sky1-bootlog"; }
   grep -q '^/scripts/init-bottom/sky1-bootlog ' "$IR/scripts/init-bottom/ORDER" || { rm -rf "$T"; die "init-bottom ORDER does not run sky1-bootlog"; }
   cmp -s "$IR/etc/sky1-bootlog.conf" "$BOOTLOG_CONF" || { rm -rf "$T"; die "initrd boot-log config differs from $BOOTLOG_CONF"; }
+  # Run the initrd's own logger with the initrd's own tools (klibc dd etc.) against a scratch
+  # file, so a tool incompatibility shows up here and not as an empty log after a test boot.
+  local S; S=$(mktemp -d)
+  head -c 65536 /dev/zero > "$S/area"
+  printf 'DEV=%s\nOFFSET=8192\nSIZE=16384\n' "$S/area" > "$S/conf"
+  env -i PATH="$IR/usr/bin:$IR/usr/sbin:$IR/bin:$IR/sbin" SKY1_BOOTLOG_CONF="$S/conf" SKY1_TMP="$S/tmp" \
+    SKY1_DMESG="echo sky1-selftest-dmesg" "$IR/usr/bin/sh" "$IR/usr/bin/sky1-bootlog" dump
+  if ! dd if="$S/area" bs=4096 skip=2 count=4 status=none | tr -d '\000' | grep -q 'sky1-selftest-dmesg'; then
+    rm -rf "$S" "$T"; die "initrd's boot logger, run with the initrd's own tools, wrote nothing"
+  fi
+  [ "$(head -c 8192 "$S/area" | tr -d '\000' | wc -c)" -eq 0 ] || { rm -rf "$S" "$T"; die "initrd's boot logger wrote outside its area"; }
+  rm -rf "$S"
+  ok "initrd's boot logger works with the initrd's own dd (self-test)"
   rm -rf "$T"
   ok "initrd has modules for $KREL and the boot logger wired into init-top/init-bottom"
   verify_bootlog
@@ -137,7 +150,9 @@ cmdline() {  # $1 = mode (dt|acpi), $2 = root uuid
     acpi) c="$c acpi=force arm-smmu-v3.disable_bypass=0" ;;
     *) die "mode must be dt or acpi" ;;
   esac
-  echo "$c$nc console=tty1"
+  # The last console= becomes /dev/console, which gets the initramfs and init messages.
+  # With SERIAL=1 that is the debug UART (ttyAMA2), so they reach the serial log.
+  if [ "${SERIAL:-0}" = 1 ]; then echo "$c$nc console=tty1 console=ttyAMA2,115200"; else echo "$c$nc console=tty1"; fi
 }
 
 write_snippet() {  # $1 = output file, $2 = mode
