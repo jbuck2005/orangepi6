@@ -20,7 +20,11 @@ dump() {
   t=${SKY1_TMP:-/run/sky1-bootlog.tmp}
   { echo "SKY1BOOTLOG $1 uptime=$(cut -d' ' -f1 /proc/uptime)"; cat /proc/cmdline; $DMESG 2>&1; echo "SKY1BOOTLOG-END"; } > "$t"
   # truncate to SIZE, pad with zeros to whole 4 KiB blocks
-  dd if="$t" of="$DEV" bs=4096 count=$((SIZE / 4096)) seek=$((OFFSET / 4096)) conv=notrunc,sync,fsync 2>/dev/null
+  # The initramfs dd is klibc's, which rejects conv=fsync ("bad conversion") and then writes
+  # nothing. So: plain notrunc,sync, then flush the device's buffers explicitly.
+  dd if="$t" of="$DEV" bs=4096 count=$((SIZE / 4096)) seek=$((OFFSET / 4096)) conv=notrunc,sync 2>/dev/null || return 1
+  if [ -b "$DEV" ]; then blockdev --flushbufs "$DEV" 2>/dev/null; fi
+  sync
 }
 
 netcon() {
