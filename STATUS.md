@@ -9,7 +9,7 @@
 - [x] Results (`scripts/gpu-test.sh`): Vulkan via panvk (Mesa 26.0.8, Ubuntu) on Mali-G720 MC10; GLES 3.1 via Panfrost;
       `glmark2-es2-drm --off-screen` 1591; `vkmark --winsys headless` 3460 (llvmpipe on Armbian: 741)
 - [ ] Device-tree boot (`arm dt`): not needed for the GPU after all, since the Sky1 patches power the GPU in ACPI mode
-- [ ] Make the sky1 kernel the default (Armbian stays the GRUB default until then)
+- [x] sky1 is the default boot (`install.sh default`), with automatic fallback to Armbian
 
 ### What it took (all checked by `install.sh verify`)
 - The initramfs must be built with a clean environment. The toolchain's `LD_LIBRARY_PATH` made
@@ -36,3 +36,12 @@
 - The CIX/Canonical vendor kernel and the closed Mali stack (`Sky1-Linux/cix-gpu-kmd` + `libmali`): closed userspace and no Vulkan.
 - NCZ-OS (including the old "Magnetar" net installer): RC kernel, Orange Pi 6 untested, vendor GPU stack by default, and telnet/root logins on by default.
 - The earlier plan in this repo (an Orange Pi vendor image built with `orangepi-build`): abandoned.
+
+## Default boot (2026-11-18)
+- `sudo WORK=... scripts/install.sh default` installs `/etc/grub.d/44_sky1_default`, which makes
+  the "Sky1 (acpi)" entry the default; Armbian stays entry 0 as the fallback. `undefault` reverts.
+- Fallback: GRUB sets `sky1_pending=1` when it boots that entry, and `sky1-boot-report` clears it
+  once userspace is up. If GRUB still finds it set (a hang, panic or power loss before userspace),
+  it boots Armbian and sets `sky1_failed=1`, so Armbian stays the default until `default` is run
+  again. One-shot test boots (`arm`) are unaffected. Both paths were tested on the board.
+- `stage` must run from Armbian (it reads the real NIC MACs from r8169); `verify`/`arm` work from either.
