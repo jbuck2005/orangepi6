@@ -122,9 +122,10 @@ cmdline() {  # $1 = mode (dt|acpi), $2 = root uuid
   # SCREEN=1 (someone at the monitor): print from the very first instruction on the EFI
   # framebuffer and stop on a panic instead of rebooting, so the message stays on screen.
   if [ "${SCREEN:-0}" = 1 ]; then panic=0; early=" earlycon=efifb keep_bootcon"; fi
-  # SERIAL=1 (debug UART logged): plain earlycon picks the UART from ACPI SPCR or the DTB's
-  # stdout-path; efi=debug makes the EFI stub report each step. Stop on panic, keep the text.
-  if [ "${SERIAL:-0}" = 1 ]; then panic=0; early=" earlycon keep_bootcon efi=debug"; fi
+  # SERIAL=1 (debug UART logged): earlycon straight on UART2 (SBSA/PL011 at 0x040d0000, the
+  # board's DEBUG header; the firmware has no SPCR table, so a bare "earlycon" prints nothing in
+  # ACPI mode). efi=debug makes the EFI stub report each step. Stop on panic, keep the text.
+  if [ "${SERIAL:-0}" = 1 ]; then panic=0; early=" earlycon=pl011,mmio32,0x040d0000 keep_bootcon efi=debug"; fi
   c="root=UUID=$uuid ro rootwait panic=$panic sky1test=$mode ignore_loglevel printk.devkmsg=on clk_ignore_unused efi=noruntime$early"
   if [ -f "$NETCON_CONF" ]; then
     # shellcheck disable=SC1090
