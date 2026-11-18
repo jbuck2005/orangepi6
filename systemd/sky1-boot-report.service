@@ -1,7 +1,7 @@
 [Unit]
-Description=Sky1 DT test boot report and network fallback
+Description=Sky1 boot report (confirms default boots; network fallback for test boots)
 ConditionKernelCommandLine=sky1test
-After=network.target
+After=network.target local-fs.target
 
 [Service]
 Type=oneshot

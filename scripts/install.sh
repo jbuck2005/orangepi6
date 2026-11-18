@@ -75,6 +75,8 @@ verify_links() {  # $1 = unpacked initrd root
   # On Armbian (r8169) the pin must not apply: udev must still pick its default .link.
   for n in /sys/class/net/*; do
     [ -e "$n/device" ] || continue
+    # Under the sky1 kernel (r8125) the pin is supposed to apply; only check r8169 ports.
+    [ "$(basename "$(readlink -f "$n/device/driver")")" = r8169 ] || continue
     ! udevadm test-builtin net_setup_link "$n" 2>&1 | grep -q '10-sky1-' || die "${n##*/}: sky1 .link applies under Armbian"
   done
   ok "$cnt NIC MAC pin(s) in initrd, inert under Armbian's r8169"
@@ -194,7 +196,11 @@ cmdline() {  # $1 = mode (dt|acpi), $2 = root uuid
   # board's DEBUG header; the firmware has no SPCR table, so a bare "earlycon" prints nothing in
   # ACPI mode). efi=debug makes the EFI stub report each step. Stop on panic, keep the text.
   if [ "${SERIAL:-0}" = 1 ]; then panic=0; early=" earlycon=pl011,mmio32,0x040d0000 keep_bootcon efi=debug"; fi
-  c="root=UUID=$uuid ro rootwait panic=$panic sky1test=$mode ignore_loglevel printk.devkmsg=on clk_ignore_unused efi=noruntime$early"
+  local tag=$mode dbg=" ignore_loglevel printk.devkmsg=on"
+  # DEFAULT=1: the everyday boot entry. Normal log level, panic reboots (so GRUB's fallback can
+  # act), early console on the debug UART, sky1test=default (boot-report confirms, never reboots).
+  if [ "${DEFAULT:-0}" = 1 ]; then panic=10; early=" earlycon=pl011,mmio32,0x040d0000"; tag=default; dbg=""; fi
+  c="root=UUID=$uuid ro rootwait panic=$panic sky1test=$tag$dbg clk_ignore_unused efi=noruntime$early"
   if [ -f "$NETCON_CONF" ]; then
     # shellcheck disable=SC1090
     . "$NETCON_CONF"
@@ -207,7 +213,82 @@ cmdline() {  # $1 = mode (dt|acpi), $2 = root uuid
   esac
   # The last console= becomes /dev/console, which gets the initramfs and init messages.
   # With SERIAL=1 that is the debug UART (ttyAMA2), so they reach the serial log.
-  if [ "${SERIAL:-0}" = 1 ]; then echo "$c$nc console=tty1 console=ttyAMA2,115200"; else echo "$c$nc console=tty1"; fi
+  if [ "${SERIAL:-0}" = 1 ]; then echo "$c$nc console=tty1 console=ttyAMA2,115200"
+  elif [ "${DEFAULT:-0}" = 1 ]; then echo "$c$nc console=ttyAMA2,115200 console=tty1"
+  else echo "$c$nc console=tty1"; fi
+}
+
+# ---- Sky1 as the default boot, with automatic fallback to Armbian ----
+# GRUB sets sky1_pending=1 when it boots the default entry; sky1-boot-report clears it once
+# userspace is up. If GRUB finds it still set, that boot never came up (hang, panic, power
+# loss): it boots Armbian instead and sets sky1_failed=1, which keeps Armbian the default
+# until "install.sh default" is run again. One-shot test boots (grub-reboot) are untouched.
+DEFAULT_SNIPPET=/etc/grub.d/44_sky1_default
+DEFAULT_ENTRY="Sky1 (acpi)"
+write_default_snippet() {  # $1 = output file
+  local uuid; uuid=$(findmnt -no UUID /); [ -n "$uuid" ] || die "no root UUID"
+  cat > "$1" <<GRUB
+#!/bin/sh
+cat <<'MENU'
+if [ "\${boot_once}" != "true" ]; then
+  if [ "\${sky1_pending}" = "1" ]; then
+    set sky1_failed=1
+    set sky1_pending=0
+    save_env sky1_failed sky1_pending
+  fi
+  if [ "\${sky1_failed}" != "1" ]; then
+    set default="$DEFAULT_ENTRY"
+  fi
+fi
+menuentry "$DEFAULT_ENTRY" {
+    set sky1_pending=1
+    save_env sky1_pending
+    search --no-floppy --fs-uuid --set=root $uuid
+    linux $BOOTDIR/vmlinuz $(DEFAULT=1 SERIAL=0 SCREEN=0 cmdline acpi "$uuid")
+    initrd $BOOTDIR/initrd.img
+}
+MENU
+GRUB
+  chmod 755 "$1"
+}
+
+check_default_cfg() {  # $1 = grub.cfg
+  local cfg=$1 first
+  grub-script-check "$cfg" || die "grub-script-check failed on $cfg"
+  first=$(grep -m1 -E '^[[:space:]]*(menuentry|submenu) ' "$cfg")
+  grep -q 'Armbian' <<<"$first" || die "entry 0 (the fallback) is not Armbian: $first"
+  [ "$(grep -c "menuentry \"$DEFAULT_ENTRY\"" "$cfg")" -eq 1 ] || die "default entry missing or duplicated"
+  grep -q "set default=\"$DEFAULT_ENTRY\"" "$cfg" || die "default selection missing"
+  grep -q 'set sky1_failed=1' "$cfg" || die "fallback logic missing"
+  grep -A4 "menuentry \"$DEFAULT_ENTRY\"" "$cfg" | grep -q 'save_env sky1_pending' || die "entry does not set sky1_pending"
+  grep -A8 "menuentry \"$DEFAULT_ENTRY\"" "$cfg" | grep -q 'sky1test=default' || die "entry lacks sky1test=default"
+  grep -A8 "menuentry \"$DEFAULT_ENTRY\"" "$cfg" | grep -q 'panic=10' || die "entry would not reboot on panic"
+  ok "grub.cfg: '$DEFAULT_ENTRY' is the default, Armbian is entry 0 and the fallback, syntax OK"
+}
+
+make_default() {
+  need_root; load_build; verify
+  systemctl is-enabled -q sky1-boot-report.service || die "sky1-boot-report.service not enabled (it confirms boots)"
+  grep -q 'sky1_pending=0' /usr/local/sbin/sky1-boot-report || die "installed boot report cannot confirm boots; run stage"
+  local tmpcfg; tmpcfg=$(mktemp)
+  write_default_snippet "$DEFAULT_SNIPPET"
+  grub-mkconfig -o "$tmpcfg" 2>/dev/null || { rm -f "$DEFAULT_SNIPPET" "$tmpcfg"; die "grub-mkconfig failed"; }
+  ( check_default_cfg "$tmpcfg" ) || { rm -f "$DEFAULT_SNIPPET" "$tmpcfg"; die "generated grub.cfg rejected; nothing installed"; }
+  install -m644 "$tmpcfg" /boot/grub/grub.cfg; rm -f "$tmpcfg"
+  check_default_cfg /boot/grub/grub.cfg
+  grub-editenv - unset sky1_failed sky1_pending
+  ! grub-editenv list | grep -qE '^sky1_(failed|pending)=' || die "fallback state not cleared"
+  ok "sky1 is the default boot; Armbian takes over automatically if a sky1 boot never comes up"
+}
+
+unmake_default() {
+  need_root
+  rm -f "$DEFAULT_SNIPPET"
+  update-grub 2>/dev/null
+  grub-script-check /boot/grub/grub.cfg || die "grub-script-check failed"
+  ! grep -q "$DEFAULT_ENTRY" /boot/grub/grub.cfg || die "default entry still in grub.cfg"
+  grub-editenv - unset sky1_failed sky1_pending
+  ok "Armbian is the default again"
 }
 
 write_snippet() {  # $1 = output file, $2 = mode
@@ -310,9 +391,11 @@ case "${1:-}" in
   verify) load_build; verify ;;
   arm) arm "${2:-}" ;;
   disarm) disarm ;;
+  default) make_default ;;
+  undefault) unmake_default ;;
   bootlog)
-    echo "== GRUB markers: $(grub-editenv list | grep -E '^sky1_(picked|stage)=' | tr '\n' ' ' || true)"
+    echo "== GRUB markers: $(grub-editenv list | grep -E '^sky1_(picked|stage|pending|failed)=' | tr '\n' ' ' || true)"
     grub-editenv list | grep -q '^sky1_picked=' || echo "   (none: GRUB has not booted the test entry since arming)"
     "$REPO/scripts/bootlog-area.sh" read "$BOOTLOG_CONF" ;;
-  *) echo "usage: $0 stage|verify|arm dt|arm acpi|disarm|bootlog"; exit 2 ;;
+  *) echo "usage: $0 stage|verify|arm dt|arm acpi|disarm|default|undefault|bootlog"; exit 2 ;;
 esac
