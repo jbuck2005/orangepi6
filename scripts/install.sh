@@ -41,6 +41,45 @@ load_build() {
   . "$WORK/env.sh"
 }
 
+# Under the sky1 kernel the vendor r8125 driver cannot read the NICs' MAC addresses in ACPI
+# mode and picks random ones (new DHCP lease, netconsole target missing). Pin each port, by
+# PCI path, to the address Armbian's r8169 reads. Driver=r8125 means Armbian never matches.
+# The initramfs udev hook copies /etc/systemd/network/*.link, so it applies there too.
+LINK_PREFIX=/etc/systemd/network/10-sky1-
+write_links() {
+  local n path mac drv count=0
+  rm -f "$LINK_PREFIX"*.link
+  for n in /sys/class/net/*; do
+    drv=$(basename "$(readlink -f "$n/device/driver" 2>/dev/null)" 2>/dev/null) || continue
+    [ "$drv" = r8169 ] || continue
+    path=$(udevadm info -q property -p "$n" | sed -n 's/^ID_PATH=//p')
+    mac=$(cat "$n/address")
+    [[ "$path" =~ ^pci-[0-9a-f:.]+$ ]] || die "unexpected ID_PATH '$path' for ${n##*/}"
+    [[ "$mac" =~ ^([0-9a-f]{2}:){5}[0-9a-f]{2}$ ]] && [ "$mac" != 00:00:00:00:00:00 ] || die "bad MAC for ${n##*/}"
+    printf '[Match]\nDriver=r8125\nPath=%s\n\n[Link]\nMACAddress=%s\nMACAddressPolicy=none\nNamePolicy=keep kernel database onboard slot path\nAlternativeNamesPolicy=database onboard slot path\n' \
+      "$path" "$mac" > "$LINK_PREFIX$path.link"
+    count=$((count + 1))
+  done
+  [ "$count" -ge 1 ] || die "no r8169 NICs found; run stage from Armbian"
+  ok "pinned $count NIC MAC(s) for r8125 under sky1 ($LINK_PREFIX*.link)"
+}
+
+verify_links() {  # $1 = unpacked initrd root
+  local f n cnt=0
+  for f in "$LINK_PREFIX"*.link; do
+    [ -f "$f" ] || die "no $LINK_PREFIX*.link (run stage)"
+    grep -qx 'Driver=r8125' "$f" || die "$f does not match only r8125"
+    cmp -s "$f" "$1/usr/lib/systemd/network/${f##*/}" || die "${f##*/} missing or stale in initrd"
+    cnt=$((cnt + 1))
+  done
+  # On Armbian (r8169) the pin must not apply: udev must still pick its default .link.
+  for n in /sys/class/net/*; do
+    [ -e "$n/device" ] || continue
+    ! udevadm test-builtin net_setup_link "$n" 2>&1 | grep -q '10-sky1-' || die "${n##*/}: sky1 .link applies under Armbian"
+  done
+  ok "$cnt NIC MAC pin(s) in initrd, inert under Armbian's r8169"
+}
+
 verify_bootlog() {
   [ -f "$BOOTLOG_CONF" ] || die "$BOOTLOG_CONF missing"
   "$REPO/scripts/bootlog-area.sh" prove "$BOOTLOG_CONF" "$BOOTLOG_FILE"
@@ -106,6 +145,7 @@ verify() {
   [ "$(head -c 8192 "$S/area" | tr -d '\000' | wc -c)" -eq 0 ] || { rm -rf "$S" "$T"; die "initrd's boot logger wrote outside its area"; }
   rm -rf "$S"
   ok "initrd's boot logger works with the initrd's own dd (self-test)"
+  ( verify_links "$IR" ) || { rm -rf "$T"; die "NIC MAC pin check failed"; }
   rm -rf "$T"
   ok "initrd has modules for $KREL and the boot logger wired into init-top/init-bottom"
   verify_bootlog
@@ -127,6 +167,7 @@ stage() {
   install -d "$(dirname "$BOOTLOG_FILE")"
   "$REPO/scripts/bootlog-area.sh" setup "$BOOTLOG_FILE" "$BOOTLOG_CONF"
   if [ -f "$WORK/netconsole.conf" ]; then install -m644 "$WORK/netconsole.conf" "$NETCON_CONF"; fi
+  write_links
   install -m755 "$REPO/initramfs/sky1-bootlog" /usr/sbin/sky1-bootlog
   rm -rf "$CONFDIR"; install -d "$(dirname "$CONFDIR")"
   cp -a /etc/initramfs-tools "$CONFDIR"
