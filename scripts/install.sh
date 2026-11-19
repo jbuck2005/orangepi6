@@ -6,6 +6,7 @@
 #   sudo WORK=...                     scripts/install.sh arm dt     # GRUB entry (device tree, GPU) as LAST entry, arm ONE boot
 #   sudo WORK=...                     scripts/install.sh arm acpi   # same kernel in ACPI mode (diagnostic: kernel/initrd OK?)
 #   sudo                              scripts/install.sh disarm     # remove the entry, clear next_entry
+#   sudo                              scripts/install.sh prune      # after a passed check: drop older sky1 module trees
 #   sudo                              scripts/install.sh bootlog    # print the raw boot log written by the last test boot
 #
 # Kernel, initrd and DTB live in /boot/sky1/, so Armbian's 10_linux never generates entries for them.
@@ -168,13 +169,8 @@ stage() {
     make -C "$SRC" HOSTCC="$HOSTCC" CC="$CC" -s modules_install
   fi
   depmod "$KREL"
-  # /boot/sky1 holds one kernel, so module trees of other sky1 releases (e.g. after a kernel
-  # update) are unused. stage runs from Armbian's kernel, so none of them is the running one.
-  local old
-  for old in "$MODROOT"/lib/modules/*-sky1 "$MODROOT"/lib/modules/*-sky1+; do
-    [ -d "$old" ] && [ "${old##*/}" != "$KREL" ] && [ "${old##*/}" != "$(uname -r)" ] || continue
-    rm -rf "$old"; ok "removed old modules ${old##*/}"
-  done
+  # Module trees of earlier sky1 releases stay until the new kernel has booted and passed
+  # `setup.sh check`, which then runs `install.sh prune`.
   install -d "$BOOTDIR"
   install -m644 "$SRC/arch/arm64/boot/Image" "$BOOTDIR/vmlinuz"
   install -m644 "$SRC/arch/arm64/boot/dts/cix/$DTB_NAME" "$BOOTDIR/$DTB_NAME"
@@ -386,6 +382,18 @@ arm() {  # $1 = mode
   ok "armed for ONE boot; afterwards GRUB falls back to entry 0 (Armbian)"
 }
 
+prune() {  # remove module trees of sky1 releases other than the one running now
+  need_root
+  local cur old n=0; cur=$(uname -r)
+  case "$cur" in *-sky1) ;; *) die "running $cur: prune only from a sky1 kernel that has passed setup.sh check";; esac
+  [ "$(cat "$BOOTDIR/kernel.release" 2>/dev/null)" = "$cur" ] || die "$BOOTDIR holds a different kernel than the running $cur"
+  for old in "$MODROOT"/lib/modules/*-sky1 "$MODROOT"/lib/modules/*-sky1+; do
+    [ -d "$old" ] && [ "${old##*/}" != "$cur" ] || continue
+    rm -rf "$old"; ok "removed old modules ${old##*/}"; n=$((n+1))
+  done
+  [ "$n" -gt 0 ] || ok "no old sky1 modules"
+}
+
 disarm() {
   need_root
   rm -f "$GRUB_SNIPPET" /etc/grub.d/06_sky1
@@ -408,9 +416,10 @@ case "${1:-}" in
   disarm) disarm ;;
   default) make_default ;;
   undefault) unmake_default ;;
+  prune) prune ;;
   bootlog)
     echo "== GRUB markers: $(grub-editenv list | grep -E '^sky1_(picked|stage|pending|failed)=' | tr '\n' ' ' || true)"
     grub-editenv list | grep -q '^sky1_picked=' || echo "   (none: GRUB has not booted the test entry since arming)"
     "$REPO/scripts/bootlog-area.sh" read "$BOOTLOG_CONF" ;;
-  *) echo "usage: $0 stage|verify|arm dt|arm acpi|disarm|default|undefault|bootlog"; exit 2 ;;
+  *) echo "usage: $0 stage|verify|arm dt|arm acpi|disarm|default|undefault|prune|bootlog"; exit 2 ;;
 esac
