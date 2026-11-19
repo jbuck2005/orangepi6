@@ -25,6 +25,10 @@ then run `scripts/setup.sh`.
 
 Details: `bench/MEMORY-AB-REPORT.md` and `STATUS.md`.
 
+## History
+[HISTORY.md](HISTORY.md) records every patch, change, release and finding to date, in order. It is updated with every
+change (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+
 ## Layout
 | Path | What |
 |---|---|
