@@ -183,8 +183,8 @@ Every hang needs a ~30 s power-off. Watch the serial log from Prometheus.
    This skips every device shutdown and syscore callback. If B resets but A did not, a shutdown
    callback leaves the board in a state where it can't reset, and A's log names it.
 4. Test C, only if B also hung at the PSCI line: boot with
-   `EXTRA_CMDLINE="initcall_debug modprobe.blacklist=scmi_cpufreq cpufreq.off=1"` and repeat A.
-   CPPC requests go to the same SCP that handles the reset, so this rules out a stuck SCP mailbox.
+   `EXTRA_CMDLINE="initcall_debug cpufreq.off=1"` and repeat A.
+   With cpufreq off there are no CPPC requests to the SCP, which the reset also goes through, so this rules out a stuck SCP mailbox.
 
 ## Testing on the board
 
