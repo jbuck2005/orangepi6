@@ -1,0 +1,57 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: orangepi6 kernel-7 port
+Subject: [PATCH] cpufreq cppc skip redundant perf requests
+
+Restores the effect of Sky1's LTS patch 'cpufreq: cppc: Skip redundant
+frequency updates', which was dropped in the 7.x port because set_target
+now also refreshes the min/max limits. Skip the PCC mailbox write only when
+desired, min and max perf are all unchanged, and force the next write after
+a failure.
+---
+ drivers/cpufreq/cppc_cpufreq.c | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/cppc_cpufreq.c b/drivers/cpufreq/cppc_cpufreq.c
+index 782b97acf..1108e1a78 100644
+--- a/drivers/cpufreq/cppc_cpufreq.c
++++ b/drivers/cpufreq/cppc_cpufreq.c
+@@ -341,12 +341,25 @@ static int cppc_cpufreq_set_target(struct cpufreq_policy *policy,
+ 	struct cppc_cpudata *cpu_data = policy->driver_data;
+ 	unsigned int cpu = policy->cpu;
+ 	struct cpufreq_freqs freqs;
++	u32 old_desired = cpu_data->perf_ctrls.desired_perf;
++	u32 old_min = cpu_data->perf_ctrls.min_perf;
++	u32 old_max = cpu_data->perf_ctrls.max_perf;
+ 	int ret = 0;
+ 
+ 	cpu_data->perf_ctrls.desired_perf =
+ 			cppc_khz_to_perf(&cpu_data->perf_caps, target_freq);
+ 	cppc_cpufreq_update_perf_limits(cpu_data, policy);
+ 
++	/*
++	 * Skip the PCC mailbox round trip when nothing changed. On Sky1 the
++	 * platform answers slowly and the governor asks for the same level
++	 * many times in a row.
++	 */
++	if (cpu_data->perf_ctrls.desired_perf == old_desired &&
++	    cpu_data->perf_ctrls.min_perf == old_min &&
++	    cpu_data->perf_ctrls.max_perf == old_max)
++		return 0;
++
+ 	freqs.old = policy->cur;
+ 	freqs.new = target_freq;
+ 
+@@ -354,9 +367,12 @@ static int cppc_cpufreq_set_target(struct cpufreq_policy *policy,
+ 	ret = cppc_set_perf(cpu, &cpu_data->perf_ctrls);
+ 	cpufreq_freq_transition_end(policy, &freqs, ret != 0);
+ 
+-	if (ret)
++	if (ret) {
+ 		pr_debug("Failed to set target on CPU:%d. ret:%d\n",
+ 			 cpu, ret);
++		/* Do not let a failed request suppress the next one. */
++		cpu_data->perf_ctrls.desired_perf = 0;
++	}
+ 
+ 	return ret;
+ }

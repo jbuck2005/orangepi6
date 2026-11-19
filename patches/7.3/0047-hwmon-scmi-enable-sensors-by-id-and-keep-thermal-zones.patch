@@ -1,0 +1,41 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: orangepi6 kernel-7 port
+Subject: [PATCH] hwmon scmi enable sensors by id and keep thermal zones
+
+7.x enables each SCMI temperature sensor with SENSOR_CONFIG_SET before
+registering its thermal zone, but passes the position in the temperature
+array instead of the sensor id, and skips the thermal zone when the call
+fails. The Sky1 firmware rejects it (err=-2 for every sensor), so no SCMI
+thermal zones were registered. Use sensor->id, and keep registering the
+thermal zone when enabling fails, as 6.18 did.
+---
+ drivers/hwmon/scmi-hwmon.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/hwmon/scmi-hwmon.c b/drivers/hwmon/scmi-hwmon.c
+index eec223d17..30bd9ec48 100644
+--- a/drivers/hwmon/scmi-hwmon.c
++++ b/drivers/hwmon/scmi-hwmon.c
+@@ -341,12 +341,17 @@ static int scmi_hwmon_probe(struct scmi_device *sdev)
+ 		if (!sensor)
+ 			continue;
+ 
+-		ret = sensor_ops->config_set(ph, i, sensor_config);
+-		if (ret) {
+-			dev_err(dev, "Error enabling sensor %s. err=%d\n",
++		/*
++		 * Enable the sensor by its SCMI id, not by its position in
++		 * the temperature array. Firmware that does not support
++		 * SENSOR_CONFIG_SET (or has the sensor always on) answers
++		 * with an error; keep registering the thermal zone then, as
++		 * older kernels did.
++		 */
++		ret = sensor_ops->config_set(ph, sensor->id, sensor_config);
++		if (ret)
++			dev_dbg(dev, "Could not enable sensor %s. err=%d\n",
+ 				sensor->name, ret);
+-			continue;
+-		}
+ 
+ 		/*
+ 		 * Warn on any misconfiguration related to thermal zones but

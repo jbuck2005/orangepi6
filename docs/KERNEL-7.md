@@ -125,8 +125,27 @@ Orion O6 / Sky1 XCP boards.
   that line is disabled. The AER logging is rate-limited and printed after the lock is dropped,
   and probe logs the local/AER IRQ numbers so the next boot log shows which line it is.
 
+- 2026-11-19, retest with `0045` (commit d454c6c): native build with 45 patches, 0 fuzz. Boots,
+  `setup.sh check` passes (7.3.5-sky1, panthor with render node, panvk Mali-G720 MC10, Panfrost).
+  All three PCIe links up with no spurious AER lines, so the storm is gone. NVMe and both r8125
+  are fine, ACE-Lite coherency is on. cpufreq is cppc_cpufreq on 5 policies and cpuidle is
+  acpi_idle with LPI-0/1/2, the same as 6.18. GPU is at parity with 6.18.14 (vkpeak
+  1201/2116/4859, vkmark 3468). Three new issues:
+  - A one-time `__setup_irq` warning from the NPU probe: it asks for `IRQF_ONESHOT` with no
+    threaded handler. Fixed in `0046`.
+  - scmi-hwmon "Error enabling sensor ... err=-2" for every temperature sensor. 7.x added a
+    SENSOR_CONFIG_SET call that passes the array position, not the sensor id, and skips the
+    thermal zone when it fails. Fixed in `0047`: uses the id and registers the zone anyway.
+  - CPU performance 12-20% below 6.18.14 (llama.cpp 1.5B Q4, 8 threads: pp512 108.6 vs 123.8,
+    tg128 29.5 vs 36.6). Candidates: the CPPC "skip redundant update" patch that was dropped in
+    the port (restored in `0048`), and the new cache-aware load balancing (`CONFIG_SCHED_CACHE=y`,
+    on by default in 7.x). `bench/cpu-diag.sh` records topology, governor and frequencies and runs
+    the benchmark as booted, with LLC balancing off, with the performance governor, and pinned to
+    the biggest cores. Run it on both kernels and compare.
+- Not done yet: an hour of load and stability testing on 7.3.5.
+
 ## Testing on the board
 
-Not done yet. Needed, in order: boots and reaches userspace (else the GRUB fallback returns to
-Armbian), NVMe and both NICs, `setup.sh check` (panthor, render node, panvk, Panfrost), then the GPU
-benchmarks against the 6.18 numbers in STATUS.md.
+Done: boot, NVMe and both NICs, `setup.sh check`, GPU benchmarks. Still needed: the CPU
+comparison with `bench/cpu-diag.sh` on both kernels, then an hour under load
+(`bench/soak-load.sh`) before this track is trusted.
