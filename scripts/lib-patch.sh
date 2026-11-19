@@ -16,5 +16,13 @@ apply_sky1_patches() {
       { echo "== REJECT ${p##*/}"; echo "$out"; } >> "$log"; echo "patch rejected: $p (see $log)"; return 1
     fi
   done
+  # patches this repo adds after the series, for API changes in $KV (none fuzzed)
+  if [ -n "${SKY1_REFRESHED:-}" ]; then
+    for p in "$REPO/$SKY1_REFRESHED"/post/*.patch; do
+      [ -f "$p" ] || continue
+      git apply --whitespace=nowarn "$p" || { echo "patch failed: $p"; return 1; }
+      n=$((n+1)); echo "== ADDED ${p##*/}" >> "$log"
+    done
+  fi
   echo "patches: $n applied exactly ($r of them refreshed in this repo), $f with fuzz (see $log)"
 }

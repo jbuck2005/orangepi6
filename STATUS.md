@@ -15,7 +15,9 @@
 - [x] The Sky1-Linux 6.18.14 patches rebased onto 6.18.64 with a 3-way merge. 134 of 139 apply unchanged; 5 are
       refreshed in `patches/6.18.64/` (conflicts in alc269 audio, macb ACPI ID includes and arm_scmi ACPI resolved by
       hand; 0011 irqchip/iommu and 0118 smmu-v3 merged without conflicts). Patching is strict: no fuzz.
-- [x] Cross-compiled for arm64 (Image, modules, DTBs) without errors
+- [x] 6.18.64 has the stable backport of the new syscore API (`register_syscore`, callbacks take `void *data`).
+      `patches/6.18.64/post/0001` converts the Sky1 PDC irqchip and PCIe drivers, as the Sky1 6.19 track does.
+- [x] Cross-compile check for arm64 (compile only; the board build is native)
 - [ ] Board test: stage, test boot, `setup.sh check`
 
 ### What it took (all checked by `install.sh verify`)
