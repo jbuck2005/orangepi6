@@ -77,7 +77,11 @@ scripts/gpu-test.sh           # optional: vulkaninfo, glmark2, vkmark
 
 ## Known issues
 - **Network ports missing after a reboot:** the firmware sometimes fails PCIe link training for the RTL8125s on a
-  warm reboot (`ip -br link` shows only `lo`). Cut the power for about 30 s. We saw this mostly on the V0.8 firmware.
+  warm reboot (`ip -br link` shows only `lo`; the serial console shows `Root Port 2/3: Link Up Fail,Ltssm State:40C80`).
+  It happens on both the V0.8 and the 2026-10-19 firmware, and only after a session that used the NICs. The board can
+  switch each NIC's 3.3 V rail from software (GPIO038/GPIO039), so `sudo scripts/nic-power.sh install` power-cycles
+  the NICs just before every reboot and, if a boot still comes up without them, power-cycles them and reboots
+  (at most twice). Without it, cut the power for about 30 s. `scripts/nic-power.sh probe` shows the state.
 - **LLMs on the GPU:** llama.cpp's Vulkan backend on panvk generates text at only ~1.7 tok/s, and prompt processing
   fails with `ErrorOutOfDeviceMemory`. Use the CPU for now: Qwen2.5-1.5B Q4 runs at ~124 tok/s for prompts and ~37 tok/s
   for generation, and 7B at ~34/9 tok/s. In a Vulkan build, pass `-dev none`.

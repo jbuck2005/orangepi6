@@ -1,0 +1,15 @@
+[Unit]
+Description=Orange Pi 6: recover RTL8125 NICs lost to failed PCIe link training
+# One-shot test boots are handled by sky1-boot-report (it falls back to Armbian).
+ConditionKernelCommandLine=!sky1test=acpi
+ConditionKernelCommandLine=!sky1test=dt
+After=systemd-udevd.service local-fs.target
+Before=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/opi6-nic-power recover
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

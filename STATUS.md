@@ -24,8 +24,11 @@
   `earlycon=pl011,mmio32,0x040d0000` (`SERIAL=1 install.sh arm ...`).
 - The GRUB test entry saves `sky1_picked`/`sky1_stage` to grubenv. `install.sh bootlog` prints them
   with the raw-disk boot log.
-- Known flake: firmware PCIe link training for the NICs sometimes fails at power-on, and then there's
-  no network at all, even on Armbian. A 30 s power-off fixes it.
+- Known flake: firmware PCIe link training for the NICs sometimes fails after a warm reboot, and then there's
+  no network at all, even on Armbian. Serial log (40 firmware boots, 2026-11-17..19): 5 failures, every one right
+  after a sky1 session, both ports `Ltssm State:40C80` = Polling.Compliance (receiver detected, NIC silent).
+  Empty ports read 40080 = Detect.Quiet. A 30 s power-off fixes it. The NIC rails are switched by GPIO038/039
+  (S5 GPIO0 lines 27/28, schematic p19-20), so `scripts/nic-power.sh` power-cycles them from software.
 
 ## Phase 2: NPU (next)
 - Leads: [visorcraft/orange-pi-6-plus-npu](https://github.com/visorcraft/orange-pi-6-plus-npu), [Sky1-Linux/sky1-drivers-dkms](https://github.com/Sky1-Linux/sky1-drivers-dkms).
