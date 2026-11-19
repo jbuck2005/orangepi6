@@ -112,6 +112,19 @@ Orion O6 / Sky1 XCP boards.
 - In ACPI mode the GPU is powered with a raw SCMI `POWER_STATE_SET` over SMC before any register
   access, as on 6.18.
 
+## Board results
+
+- 2026-11-19, first boot (commit 894bd12): native build on the board (gcc 15.2) had 0 errors.
+  The boot reached `Linux version 7.3.5-sky1` and then died. The NVMe root port's AER interrupt
+  fired about 90 times a second right after PCIe link training, with no error latched anywhere
+  (root error status 0, DEVSTA error bits 0). Each interrupt logged two lines to the serial
+  console while holding a spinlock with interrupts off, which led to a hard lockup in the AER
+  thread at 24.6 s and a panic. The Sky1 PCIe driver code is the same as on 6.18, so something in
+  the 7.x core makes the line assert. Not root-caused yet.
+- Fix in `0045`: an AER interrupt with nothing latched returns `IRQ_NONE`. After 64 in a row,
+  that line is disabled. The AER logging is rate-limited and printed after the lock is dropped,
+  and probe logs the local/AER IRQ numbers so the next boot log shows which line it is.
+
 ## Testing on the board
 
 Not done yet. Needed, in order: boots and reaches userspace (else the GRUB fallback returns to
