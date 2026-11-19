@@ -5,13 +5,13 @@
 # switched off in its web UI) or a plug running Tasmota. The off/on sequence runs ON THE PLUG
 # (Shelly toggle_after / Tasmota Backlog Delay), so power comes back even if this PC goes away mid-cycle.
 #
-# Home Assistant: any plug HA can switch (e.g. an Emporia plug). Create an HA script that does
-# off -> delay 30 s -> on (see INSTALL.md), so the off/on runs inside HA and power always comes back.
+# Home Assistant: any plug HA can switch (e.g. an Emporia plug). This script calls HA's REST API for
+# switch.turn_off, waits, then switch.turn_on, retrying turn_on until HA confirms the switch is on.
 #
 # Config (kept outside the repo, so no LAN addresses, tokens or passwords get committed): a JSON file,
 # default aipi-plug.json next to serial.log:
 #   { "type": "homeassistant", "url": "http://<ha address>:8123", "token": "<long-lived token>",
-#     "script": "script.aipi_power_cycle" }
+#     "entity": "switch.<plug>", "offSeconds": 30 }
 #   { "type": "shelly", "host": "<plug address>", "user": "", "password": "", "offSeconds": 30 }
 #   "type": "tasmota" works like shelly.
 #
@@ -42,15 +42,28 @@ function Invoke-PowerCycle {
       Invoke-RestMethod -Uri "http://$($cfg.host)/cm?cmnd=$cmd$auth" -TimeoutSec 10 | Out-Null
     }
     'homeassistant' {
-      # Runs the HA script (off, wait, on). Returns as soon as HA has started it.
-      $h = @{ Authorization = "Bearer $($cfg.token)" }
-      $body = @{ entity_id = $cfg.script } | ConvertTo-Json
-      Invoke-RestMethod -Method Post -Uri "$($cfg.url.TrimEnd('/'))/api/services/script/turn_on" `
-        -Headers $h -ContentType 'application/json' -Body $body -TimeoutSec 15 | Out-Null
+      $base = $cfg.url.TrimEnd('/'); $h = @{ Authorization = "Bearer $($cfg.token)" }
+      $body = @{ entity_id = $cfg.entity } | ConvertTo-Json
+      function Ha($svc) { Invoke-RestMethod -Method Post -Uri "$base/api/services/switch/$svc" -Headers $h -ContentType 'application/json' -Body $body -TimeoutSec 15 | Out-Null }
+      function HaState { (Invoke-RestMethod -Uri "$base/api/states/$($cfg.entity)" -Headers $h -TimeoutSec 15).state }
+      Ha 'turn_off'
+      Start-Sleep -Seconds $off
+      # Power must come back: retry turn_on for up to 10 minutes until HA reports the switch on.
+      $deadline = (Get-Date).AddMinutes(10); $ok = $false
+      while (-not $ok -and (Get-Date) -lt $deadline) {
+        try { Ha 'turn_on'; Start-Sleep -Seconds 3; $ok = (HaState) -eq 'on' } catch { Write-Warning "turn_on failed: $($_.Exception.Message)" }
+        if (-not $ok) { Start-Sleep -Seconds 10 }
+      }
+      if (-not $ok) {
+        $msg = "=== $(Get-Date -Format s) plug-watch: *** FAILED TO TURN aiPi BACK ON via $($cfg.entity); it is probably still OFF ***"
+        $msg | Add-Content -Path $Log -Encoding utf8; Write-Host $msg -ForegroundColor Red
+        try { [console]::beep(880, 1500) } catch {}
+        throw 'power not restored'
+      }
     }
     default { throw "unknown plug type '$($cfg.type)'" }
   }
-  "=== $(Get-Date -Format s) plug-watch: power cycle started ($($cfg.type))" | Add-Content -Path $Log -Encoding utf8
+  "=== $(Get-Date -Format s) plug-watch: power-cycled aiPi ($off s off, $($cfg.type))" | Add-Content -Path $Log -Encoding utf8
 }
 
 if ($Once) { Invoke-PowerCycle; return }

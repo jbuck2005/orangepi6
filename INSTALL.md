@@ -83,10 +83,10 @@ scripts/gpu-test.sh           # optional: vulkaninfo, glmark2, vkmark
   with its cloud switched off, or a Tasmota plug) and run `tools/plug-watch.ps1` on the PC that logs the serial
   console: it power-cycles the board when the firmware reports the failure (at most 3 times an hour), and
   `-Once` does a cycle by hand. `tools/plug-powercycle.sh` does a single cycle from Linux. The plug's address
-  and password live in a JSON file outside the repo. With **Home Assistant** (any plug HA can switch), create a
-  script `script.aipi_power_cycle` that turns the plug's switch off, waits 30 s and turns it on (mode: single),
-  plus an automation that turns the switch back on if it has been off for 2 minutes, then use
-  `{"type":"homeassistant","url":"http://<ha>:8123","token":"<long-lived token>","script":"script.aipi_power_cycle"}`. (`scripts/nic-power.sh`, which switches the NIC rails
+  and password live in a JSON file outside the repo. With **Home Assistant** (any plug HA can switch), create a long-lived
+  access token and use `{"type":"homeassistant","url":"http://<ha>:8123","token":"<token>","entity":"switch.<plug>"}`:
+  the watcher calls `switch.turn_off`, waits 30 s, then `switch.turn_on`, retrying for up to 10 minutes and
+  logging loudly if the plug doesn't come back on. (`scripts/nic-power.sh`, which switches the NIC rails
   through GPIO038/039, is experimental: it froze the board under Armbian.)
 - **LLMs on the GPU:** llama.cpp's Vulkan backend on panvk generates text at only ~1.7 tok/s, and prompt processing
   fails with `ErrorOutOfDeviceMemory`. Use the CPU for now: Qwen2.5-1.5B Q4 runs at ~124 tok/s for prompts and ~37 tok/s
