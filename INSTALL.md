@@ -84,7 +84,8 @@ scripts/gpu-test.sh           # optional: vulkaninfo, glmark2, vkmark
   console: it power-cycles the board when the firmware reports the failure (at most 3 times an hour), and
   `-Once` does a cycle by hand. `tools/plug-powercycle.sh` does a single cycle from Linux. The plug's address
   and password live in a JSON file outside the repo. With **Home Assistant** (any plug HA can switch), create a long-lived
-  access token and use `{"type":"homeassistant","url":"http://<ha>:8123","token":"<token>","entity":"switch.<plug>"}`:
+  access token and use `{"type":"homeassistant","url":"http://<ha>:8123","entity":"switch.<plug>","token_file":"<file>"}`
+  (the file holds just the token, chmod 600; or add `"token_var":"HA_TOKEN"` to read one variable from an env file):
   the watcher calls `switch.turn_off`, waits 30 s, then `switch.turn_on`, retrying for up to 10 minutes and
   logging loudly if the plug doesn't come back on. (`scripts/nic-power.sh`, which switches the NIC rails
   through GPIO038/039, is experimental: it froze the board under Armbian.)

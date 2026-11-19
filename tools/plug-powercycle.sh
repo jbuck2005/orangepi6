@@ -4,6 +4,7 @@
 #   tools/plug-powercycle.sh [config.json]   (default ~/.config/aipi-plug.json; keep it out of the repo)
 # Home Assistant config example (token in its own chmod 600 file):
 #   {"type":"homeassistant","url":"http://<ha>:8123","entity":"switch.<plug>","token_file":"~/.config/aipi-ha-token","offSeconds":30}
+# or reuse a variable from an existing env file:  "token_file":"<path/to/.env>","token_var":"HA_TOKEN"
 set -euo pipefail
 CFG=${1:-$HOME/.config/aipi-plug.json}
 j() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get(sys.argv[2]) or "")' "$CFG" "$1"; }
@@ -11,10 +12,26 @@ TYPE=$(j type); HOST=$(j host); USER_=$(j user); PASS=$(j password); OFF=$(j off
 AUTH=(); [ -n "$USER_" ] && AUTH=(--digest -u "$USER_:$PASS")
 case "$TYPE" in
   homeassistant)
-    URL=$(j url); URL=${URL%/}; TOKEN=$(j token); ENT=$(j entity); TF=$(j token_file)
-    # Prefer a separate token file (chmod 600) so the JSON holds no secret.
-    if [ -n "$TF" ]; then TF=${TF/#\~/$HOME}; TOKEN=$(tr -d ' \r\n' < "$TF"); fi
-    [ -n "$TOKEN" ] && [ -n "$ENT" ] || { echo "homeassistant config needs entity and token or token_file" >&2; exit 1; }
+    URL=$(j url); URL=${URL%/}; TOKEN=$(j token); ENT=$(j entity); TF=$(j token_file); TV=$(j token_var)
+    # Prefer a separate token file (chmod 600) so the JSON holds no secret. With token_var, the file is
+    # an env file (VAR=value lines, optional "export " and quotes) and only that variable is read; the
+    # file is parsed, never sourced.
+    if [ -n "$TF" ]; then
+      TF=${TF/#\~/$HOME}
+      if [ -n "$TV" ]; then
+        TOKEN=$(python3 -c '
+import re, sys
+for line in open(sys.argv[1]):
+    m = re.match(r"\s*(?:export\s+)?" + re.escape(sys.argv[2]) + r"\s*=\s*(.*?)\s*$", line)
+    if m:
+        v = m.group(1)
+        if len(v) > 1 and v[0] == v[-1] and v[0] in "\"\x27": v = v[1:-1]
+        print(v); break' "$TF" "$TV")
+      else
+        TOKEN=$(tr -d ' \r\n' < "$TF")
+      fi
+    fi
+    [ -n "$TOKEN" ] && [ -n "$ENT" ] || { echo "homeassistant config needs entity and a token (token, token_file, or token_file + token_var)" >&2; exit 1; }
     ha() { curl -fsS -m 15 -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
              -d "{\"entity_id\": \"$ENT\"}" "$URL/api/services/switch/$1" >/dev/null; }
     state() { curl -fsS -m 15 -H "Authorization: Bearer $TOKEN" "$URL/api/states/$ENT" | python3 -c 'import json,sys; print(json.load(sys.stdin)["state"])'; }
