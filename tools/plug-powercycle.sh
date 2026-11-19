@@ -2,6 +2,8 @@
 # One power cycle of aiPi through Home Assistant (REST: switch.turn_off, wait, switch.turn_on with retries), or a Shelly (Gen2+) or
 # Tasmota plug. Same config as plug-watch.ps1.
 #   tools/plug-powercycle.sh [config.json]   (default ~/.config/aipi-plug.json; keep it out of the repo)
+# Home Assistant config example (token in its own chmod 600 file):
+#   {"type":"homeassistant","url":"http://<ha>:8123","entity":"switch.<plug>","token_file":"~/.config/aipi-ha-token","offSeconds":30}
 set -euo pipefail
 CFG=${1:-$HOME/.config/aipi-plug.json}
 j() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get(sys.argv[2]) or "")' "$CFG" "$1"; }
@@ -9,7 +11,10 @@ TYPE=$(j type); HOST=$(j host); USER_=$(j user); PASS=$(j password); OFF=$(j off
 AUTH=(); [ -n "$USER_" ] && AUTH=(--digest -u "$USER_:$PASS")
 case "$TYPE" in
   homeassistant)
-    URL=$(j url); URL=${URL%/}; TOKEN=$(j token); ENT=$(j entity)
+    URL=$(j url); URL=${URL%/}; TOKEN=$(j token); ENT=$(j entity); TF=$(j token_file)
+    # Prefer a separate token file (chmod 600) so the JSON holds no secret.
+    if [ -n "$TF" ]; then TF=${TF/#\~/$HOME}; TOKEN=$(tr -d ' \r\n' < "$TF"); fi
+    [ -n "$TOKEN" ] && [ -n "$ENT" ] || { echo "homeassistant config needs entity and token or token_file" >&2; exit 1; }
     ha() { curl -fsS -m 15 -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
              -d "{\"entity_id\": \"$ENT\"}" "$URL/api/services/switch/$1" >/dev/null; }
     state() { curl -fsS -m 15 -H "Authorization: Bearer $TOKEN" "$URL/api/states/$ENT" | python3 -c 'import json,sys; print(json.load(sys.stdin)["state"])'; }
