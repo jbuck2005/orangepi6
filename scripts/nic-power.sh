@@ -15,8 +15,8 @@
 # Releasing a line (direction = input) always restores power through the pull-up, so a crash
 # mid-cycle cannot leave the NICs off for longer than until the next boot.
 #
-# The registers are written through /dev/mem, so this works the same under Armbian's generic kernel
-# (no S5 GPIO driver) and the sky1 kernel. Only lines 27 and 28 are touched (read-modify-write).
+# Under the sky1 kernel (S5 GPIO driver bound) it uses gpioset/gpioget on that chip. Under Armbian's generic
+# kernel (no driver) it writes the registers through /dev/mem, touching only lines 27 and 28.
 #
 # Usage (as root):
 #   nic-power.sh probe                 read-only: registers, pad mux, NICs, PCIe state
@@ -77,17 +77,43 @@ pads_to_gpio() {  # make sure GPIO038/039 pads are muxed to GPIO (function 0)
   for p in $PADS; do mem rmw $(printf '0x%x' $(( PAD_BASE + p ))) 0x180 0 >/dev/null || return 1; done
 }
 
-power() {  # power off|on
-  local M; M=$(mask)
+# Under the sky1 kernel the S5 GPIO and iomux blocks are owned by kernel drivers, so go through
+# libgpiod (gpioset/gpioget) on that chip. Under Armbian nothing owns them, so poke the registers.
+iomem_owner() { awk -v a="$1" 'index($1, a"-") == 1 {print $3; exit}' /proc/iomem 2>/dev/null; }
+gpio_chip() {  # gpiochip whose parent device owns the S5 GPIO0 MMIO block
+  local owner c; owner=$(iomem_owner 16004000)
+  [ -n "$owner" ] || return 1
+  for c in /sys/bus/gpio/devices/gpiochip*; do
+    readlink -f "$c" | grep -q "/$owner/" && { echo "${c##*/}"; return 0; }
+  done
+  return 1
+}
+gpiod_v2() { gpioset --version 2>/dev/null | grep -q 'v2'; }
+
+power() {  # power off SECS (cut, wait, restore) | power on
+  local M chip l args=() inargs=()
+  M=$(mask)
+  if chip=$(gpio_chip); then
+    command -v gpioset >/dev/null || die "S5 GPIO is driver-owned ($chip); install gpiod (apt install gpiod)"
+    for l in $LINES; do args+=("$l=0"); inargs+=("$l"); done
+    if [ "$1" = off ]; then
+      if gpiod_v2; then timeout "$2" gpioset -c "$chip" "${args[@]}" || true; else gpioset --mode=time --sec="$2" "$chip" "${args[@]}"; fi
+    fi
+    # Reading the lines requests them as inputs: the pull-ups switch the rails back on.
+    if gpiod_v2; then gpioget -c "$chip" "${inargs[@]}" >/dev/null; else gpioget "$chip" "${inargs[@]}" >/dev/null; fi
+    return
+  fi
+  [ -z "$(iomem_owner 16004000)" ] || die "S5 GPIO is owned by a driver but no gpiochip found for it"
   if [ "$1" = off ]; then
-    pads_to_gpio || return 1
+    [ -z "$(iomem_owner 16007000)" ] && { pads_to_gpio || return 1; }
     mem rmw "$(reg 0x00)" "$M" 0  >/dev/null &&   # GPIO mode (clear bypass)
     mem rmw "$(reg 0x0c)" "$M" 0  >/dev/null &&   # output value 0
     mem rmw "$(reg 0x08)" 0 "$M"  >/dev/null &&   # output enable
-    mem rmw "$(reg 0x04)" "$M" 0  >/dev/null      # direction = output -> pads low -> rails off
-  else
-    mem rmw "$(reg 0x04)" 0 "$M"  >/dev/null      # direction = input -> pull-ups -> rails on
+    mem rmw "$(reg 0x04)" "$M" 0  >/dev/null ||   # direction = output -> pads low -> rails off
+      { mem rmw "$(reg 0x04)" 0 "$M" >/dev/null; return 1; }
+    sleep "$2"
   fi
+  mem rmw "$(reg 0x04)" 0 "$M"  >/dev/null        # direction = input -> pull-ups -> rails on
 }
 
 detach_nics() {  # unbind and remove the NIC PCI functions so nothing touches them while unpowered
@@ -102,9 +128,7 @@ cycle() {
   local secs=${1:-$OFF_SECS}
   log "power-cycling NICs (${secs}s off); present before: $(nic_count)"
   detach_nics
-  power off || { power on; die "could not drive GPIO038/039"; }
-  sleep "$secs"
-  power on
+  power off "$secs" || { power on; die "could not drive GPIO038/039"; }
   sleep 1
   echo 1 > /sys/bus/pci/rescan 2>/dev/null
   sleep 2
@@ -124,7 +148,7 @@ probe() {
   echo "  expect: in line27=1 line28=1 (pulled up = NICs powered)"
   echo "== pad mux (function bits 8:7, 0 = GPIO)"
   for p in $PADS; do v=$(mem read "$(printf '0x%x' $(( PAD_BASE + p )))"); printf '  pad +%s = %s  func=%d\n' "$p" "$v" $(( (v >> 7) & 3 )); done
-  echo "== gpiochips"; ls /sys/bus/gpio/devices 2>/dev/null | tr '\n' ' '; echo
+  echo "== S5 GPIO0 owner: $(iomem_owner 16004000) -> chip: $(gpio_chip || echo 'none (registers via /dev/mem)')  gpioset: $(command -v gpioset || echo missing)"
   command -v gpioinfo >/dev/null && gpioinfo 2>/dev/null | grep -iE 'chip|line +2[78]:' | head -20
   echo "== RTL8125 PCI functions ($(nic_count) of $EXPECT)"
   for b in $(nic_bdfs); do echo "  $b driver=$(basename "$(readlink -f /sys/bus/pci/devices/$b/driver 2>/dev/null)" 2>/dev/null) net=$(ls /sys/bus/pci/devices/$b/net 2>/dev/null | tr '\n' ' ')"; done
