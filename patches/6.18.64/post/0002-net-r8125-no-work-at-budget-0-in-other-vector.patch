@@ -1,0 +1,30 @@
+From: jbuck2005 <59450931+jbuck2005@users.noreply.github.com>
+Subject: [PATCH] net: r8125: don't report work from the "other" vector at budget 0
+
+netpoll (netconsole) calls every NAPI poll of the device with a budget of 0
+to clean Tx only, and warns once if a poll returns non-zero:
+
+  WARNING: net/core/netpoll.c:157 ... exceeded budget in poll
+
+The Rx and Tx polls return 0 at budget 0, but rtl8125_poll_msix_other()
+always completed NAPI and returned 1. With a
+budget of 0 return 0 straight away; that vector has no Tx work.
+
+---
+--- a/drivers/net/ethernet/realtek/r8125/r8125_n.c
++++ b/drivers/net/ethernet/realtek/r8125/r8125_n.c
+@@ -17234,6 +17234,14 @@
+         (void)(dev);
+         (void)(work_to_do);
+ 
++        /*
++         * netpoll (netconsole) polls with a budget of 0 to clean Tx only.
++         * This vector has no Tx work; it must neither complete NAPI nor
++         * report work it was not given budget for.
++         */
++        if (!budget)
++                return 0;
++
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0)
+         RTL_NETIF_RX_COMPLETE(dev, napi, work_to_do);
+ #else

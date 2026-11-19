@@ -18,7 +18,11 @@
 - [x] 6.18.64 has the stable backport of the new syscore API (`register_syscore`, callbacks take `void *data`).
       `patches/6.18.64/post/0001` converts the Sky1 PDC irqchip and PCIe drivers, as the Sky1 6.19 track does.
 - [x] Cross-compile check for arm64 (compile only; the board build is native)
-- [ ] Board test: stage, test boot, `setup.sh check`
+- [x] Board test (native build, gcc 15.2): 6.18.64-sky1 boots in ACPI mode; panthor, panvk and Panfrost OK
+      (`setup.sh check`); NVMe, all 3 PCIe links (SMMU bypass STEs, no AER/SMMU faults) and both RTL8125 NICs up.
+      Benchmarks match 6.18.14: vkpeak FP32 1205 GFLOPS, vkmark 3544.
+- [x] netconsole warned once at boot ("exceeded budget in poll"): the r8125 "other" MSI-X vector reported work at
+      netpoll's budget of 0. Fixed in `patches/6.18.64/post/0002`.
 
 ### What it took (all checked by `install.sh verify`)
 - The initramfs must be built with a clean environment. The toolchain's `LD_LIBRARY_PATH` made
