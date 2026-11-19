@@ -1,0 +1,85 @@
+From: jbuck2005 <59450931+jbuck2005@users.noreply.github.com>
+Subject: [PATCH] PCI: sky1: clear latched local errors on AER interrupts
+
+Ported from the kernel-7 track (patches/7.3/0049), applies unchanged after
+post/0003.
+
+sky1_pcie_enable_local_irq() masks the AER-class local errors (PHY error,
+replay timer/rollover, FC, completion timeout, ...) from the local IRQ, and
+only the local IRQ handler ever cleared I_LOCAL_ERR_STS_REG0. A local error
+latched during PHY bring-up (seen after 'waiting PHY is ready! retries = 1')
+stayed set while the AER lines kept firing with the AER capability
+registers all zero (dev_sts 0x3950). Clear stale local errors before
+enabling the interrupts, and when an AER interrupt finds nothing in the AER
+registers, clear and report latched local errors and count it as handled.
+The 0045 spurious-interrupt cut-off still covers anything else.
+---
+ drivers/pci/controller/cadence/pci-sky1.c | 40 ++++++++++++++++++++++++++++++-
+ 1 file changed, 39 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/pci/controller/cadence/pci-sky1.c b/drivers/pci/controller/cadence/pci-sky1.c
+index b48f713d2..7458797e1 100644
+--- a/drivers/pci/controller/cadence/pci-sky1.c
++++ b/drivers/pci/controller/cadence/pci-sky1.c
+@@ -714,6 +714,32 @@ static void sky1_pcie_handle_ep_aer_irq(struct sky1_pcie *pcie)
+ 			       uncorr_val);
+ }
+ 
++/*
++ * Local errors that sky1_pcie_enable_local_irq() masks from the local IRQ
++ * (PHY error, replay timeouts, FC errors, ...). They are latched in
++ * I_LOCAL_ERR_STS_REG0 and only the local IRQ handler ever cleared that
++ * register, so a latched one (seen after a PHY-ready retry) stayed set while
++ * the AER lines kept firing with nothing in the AER registers.
++ * Clear and report them; returns the bits that were set.
++ */
++#define SKY1_LOCAL_AER_BITS	(LOCAL_INT_AER | LOCAL_ERR_NFTTO)
++
++static u32 sky1_pcie_clear_local_aer(struct sky1_pcie *pcie, const char *when)
++{
++	void __iomem *reg_base = pcie->reg_base + CDNS_PCIE_RP_BASE;
++	u32 sta = readl(reg_base + I_LOCAL_ERR_STS_REG0) & SKY1_LOCAL_AER_BITS;
++	int i;
++
++	if (!sta)
++		return 0;
++	writel(sta, reg_base + I_LOCAL_ERR_STS_REG0);
++	for (i = 0; i < 32; i++)
++		if (sta & BIT(i))
++			dev_warn_ratelimited(pcie->dev, "%s: local err0 %s latched, cleared\n",
++					     when, sky1_local_err_msg(PCIE_LOCAL_ERR0, i));
++	return sta;
++}
++
+ static const char *sky1_pcie_aer_irq_name(struct sky1_pcie *pcie, int irq)
+ {
+ 	if (irq == pcie->aer_c_irq)
+@@ -766,8 +792,17 @@ static irqreturn_t sky1_pcie_aer_irq_handler(int irq, void *arg)
+ 	if (!sta && !corr && !uncorr &&
+ 	    !(devsta & (PCI_EXP_DEVSTA_CED | PCI_EXP_DEVSTA_NFED |
+ 			PCI_EXP_DEVSTA_FED))) {
++		unsigned int n;
++
++		/* A latched local (non-AER-capability) error is a source we can clear. */
++		if (sky1_pcie_clear_local_aer(pcie, sky1_pcie_aer_irq_name(pcie, irq))) {
++			pcie->aer_spurious = 0;
++			spin_unlock_irqrestore(&pcie->aer_lock, flags);
++			return IRQ_HANDLED;
++		}
++
+ 		/* Nothing latched: not ours, or a source we cannot clear. */
+-		unsigned int n = ++pcie->aer_spurious;
++		n = ++pcie->aer_spurious;
+ 
+ 		spin_unlock_irqrestore(&pcie->aer_lock, flags);
+ 		dev_warn_ratelimited(pcie->dev,
+@@ -846,6 +881,9 @@ static void sky1_pcie_disable_irq(struct sky1_pcie *pcie)
+ 
+ static void sky1_pcie_enable_irq(struct sky1_pcie *pcie, bool en)
+ {
++	/* Do not start with errors latched during PHY bring-up. */
++	if (en)
++		sky1_pcie_clear_local_aer(pcie, "irq enable");
+ 	/* local (some error status) */
+ 	sky1_pcie_enable_local_irq(pcie, en);
+ 	sky1_pcie_enable_indicatbit_int(pcie, en);
