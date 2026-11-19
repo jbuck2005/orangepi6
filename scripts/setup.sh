@@ -6,7 +6,7 @@
 # Steps (each one is checked; the script stops with a clear message on the first failure):
 #   1. preflight   board, firmware, OS, disk space, network
 #   2. packages    build dependencies and Mesa/Vulkan userspace from the Ubuntu archive (apt)
-#   3. source      kernel.org 6.18.14 (signature checked) + Sky1-Linux patches + this repo's DTS
+#   3. source      kernel.org $KV from kernel.conf (signature checked) + Sky1-Linux patches + this repo's DTS
 #   4. build       Image, modules, DTBs (-j6, 20-60 min)
 #   5. stage       /boot/sky1/*, modules, initramfs, NIC MAC pins; then install.sh verify
 #   6. default     "Sky1 (acpi)" becomes the GRUB default; Armbian stays entry 0 and the
@@ -21,7 +21,8 @@ set -euo pipefail
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 WORK=${WORK:-$HOME/sky1-build}
 export WORK
-KV=6.18.14
+# shellcheck disable=SC1091
+. "$REPO/kernel.conf"
 RELEASE_TAG=${RELEASE_TAG:-v2026.11.19}
 RELEASE_URL=${RELEASE_URL:-https://github.com/jbuck2005/orangepi6/releases/download/$RELEASE_TAG}
 STEPS="preflight packages source build stage default"
@@ -69,7 +70,7 @@ packages() {
   say "packages (apt)"
   sudo apt-get update -q
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q \
-    build-essential flex bison bc cpio kmod xz-utils zstd libssl-dev libelf-dev \
+    build-essential flex bison bc cpio kmod xz-utils zstd libssl-dev libelf-dev patch \
     git curl gnupg ca-certificates device-tree-compiler dosfstools \
     mesa-vulkan-drivers mesa-utils vulkan-tools
   ls /lib/firmware/arm/mali/arch12.8/mali_csffw.bin >/dev/null || die "Mali CSF firmware missing (linux-firmware)"

@@ -18,6 +18,8 @@ ok()   { echo "  ok: $*"; }
 need_root() { [ "$(id -u)" -eq 0 ] || die "run with sudo"; }
 
 REPO=$(cd "$(dirname "$0")/.." && pwd)
+# shellcheck disable=SC1091
+. "$REPO/kernel.conf"
 DTB_NAME=sky1-orangepi-6.dtb
 BOOTDIR=${BOOTDIR:-/boot/sky1}
 MODROOT=${MODROOT:-}   # test hook: alternate root for /lib/modules
@@ -30,7 +32,7 @@ NETCON_CONF=/etc/sky1-netconsole.conf
 
 load_build() {
   : "${WORK:?set WORK to the build directory}"
-  SRC=$WORK/linux-6.18.14
+  SRC=$WORK/linux-$KV
   [ -f "$SRC/include/config/kernel.release" ] || die "no kernel.release; build not finished"
   KREL=$(cat "$SRC/include/config/kernel.release")
   [ -n "$KREL" ] || die "empty kernel release"
@@ -352,7 +354,7 @@ check_disarmed() {  # $1 = grub.cfg
   local first
   grub-script-check "$1" || die "grub-script-check failed on $1"
   ! grep -q "$ENTRY_PREFIX" "$1" || die "test entry still in $1"
-  ! grep -q '6.18.14-sky1' "$1" || die "sky1 kernel still referenced in $1"
+  ! grep -q "$KV-sky1" "$1" || die "sky1 kernel still referenced in $1"
   first=$(grep -m1 -E '^[[:space:]]*(menuentry|submenu) ' "$1")
   grep -q "Armbian GNU/Linux, with Linux $(uname -r)'" <<<"$first" || die "first entry is not the running Armbian kernel: $first"
   ok "grub.cfg: only Armbian entries, running kernel is entry 0"
