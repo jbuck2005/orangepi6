@@ -20,9 +20,9 @@
 #
 # Usage (as root):
 #   nic-power.sh probe                 read-only: registers, pad mux, NICs, PCIe state
-#   nic-power.sh cycle [SECONDS]       remove the NIC PCI devices, cut power, restore it, rescan
-#   nic-power.sh selftest              cycle once (network drops ~15 s); if the NICs don't come back
-#                                      within 60 s, reboot. Run detached: systemd-run --unit nic-selftest ...
+#   nic-power.sh cycle [SECONDS]       remove the NIC PCI devices, cut power, restore it (reboot afterwards!)
+#   nic-power.sh selftest              arm a forced-reboot fallback, cycle once logging the root-port links,
+#                                      then reboot. Run detached: systemd-run --unit nic-selftest ...
 #   nic-power.sh recover               boot-time: if NICs are missing, power-cycle and reboot (max 2 tries)
 #   nic-power.sh shutdown-hook ACTION  systemd-shutdown hook: on reboot, power-cycle the NICs last thing
 #   nic-power.sh install | uninstall   install the boot unit and the shutdown hook
@@ -124,15 +124,57 @@ detach_nics() {  # unbind and remove the NIC PCI functions so nothing touches th
   done
 }
 
+# Root ports above the NICs (remembered before the NICs are removed), and their link state.
+nic_rootports() { local b; for b in $(nic_bdfs); do basename "$(dirname "$(readlink -f /sys/bus/pci/devices/$b)")"; done; }
+link_state() {  # print "up"/"down" for a root port, from its PCIe Link Status (DLLLA, bit 13); config reads of a root port are safe
+  python3 -I - "$1" <<'PY'
+import sys
+try:
+    c = open("/sys/bus/pci/devices/%s/config" % sys.argv[1], "rb").read(256)
+except OSError:
+    print("gone"); sys.exit()
+p = c[0x34]
+while p:
+    if c[p] == 0x10:
+        ls = c[p + 0x12] | (c[p + 0x13] << 8)
+        print("up" if ls & 0x2000 else "down"); break
+    p = c[p + 1]
+else:
+    print("?")
+PY
+}
+note() { log "$*"; [ -n "${OUT:-}" ] && { echo "$(date +%T) $*" >> "$OUT"; sync; }; return 0; }
+
+# Independent fallback, armed before anything is touched: if this script, a PCI operation or the
+# normal reboot path hangs, force an immediate reboot (sysrq 'b' skips device shutdown).
+arm_fallback() {
+  local secs=$1 cmd='echo 1 > /proc/sys/kernel/sysrq; echo s > /proc/sysrq-trigger; sleep 3; echo b > /proc/sysrq-trigger'
+  sysctl -qw kernel.panic=10 kernel.panic_on_oops=1 2>/dev/null
+  systemd-run --quiet --collect --unit "opi6-nic-fallback-$$" --on-active="${secs}s" /bin/sh -c "$cmd" 2>/dev/null \
+    && note "fallback armed: systemd timer forces a reboot in ${secs}s"
+  ( sleep $((secs + 30)); sh -c "$cmd" ) </dev/null >/dev/null 2>&1 &
+  disown 2>/dev/null
+}
+
+# Cut the NIC rails. No PCI rescan: a config read behind a link that is still training can hang the
+# bus on this SoC, so every caller reboots afterwards and lets the firmware train fresh NICs.
 cycle() {
-  local secs=${1:-$OFF_SECS}
-  log "power-cycling NICs (${secs}s off); present before: $(nic_count)"
+  local secs=${1:-$OFF_SECS} rps rp
+  rps=$(nic_rootports)
+  note "power-cycling NICs (${secs}s off); NICs present: $(nic_count); root ports: $(for rp in $rps; do printf '%s=%s ' "$rp" "$(link_state "$rp")"; done)"
   detach_nics
-  power off "$secs" || { power on; die "could not drive GPIO038/039"; }
-  sleep 1
-  echo 1 > /sys/bus/pci/rescan 2>/dev/null
-  sleep 2
-  log "power restored; present after rescan: $(nic_count)"
+  note "NIC PCI functions removed"
+  if [ "${CHECK_OFF:-0}" = 1 ]; then
+    # Selftest only: hold the rails off in the background long enough to see the links drop.
+    ( power off "$secs" ) & local pid=$!
+    sleep 1
+    note "rails off: root ports $(for rp in $rps; do printf '%s=%s ' "$rp" "$(link_state "$rp")"; done)"
+    note "rootfs device still readable: $(timeout 5 dd if="$(findmnt -no SOURCE /)" of=/dev/null bs=4k count=1 iflag=direct 2>/dev/null && echo yes || echo NO)"
+    wait $pid || { power on; note "could not drive GPIO038/039"; return 1; }
+  else
+    power off "$secs" || { power on; note "could not drive GPIO038/039"; return 1; }
+  fi
+  note "rails back on"
 }
 
 probe() {
@@ -172,13 +214,12 @@ recover() {
   if [ "$n" -ge "$EXPECT" ]; then echo 0 > "$STATE/attempts"; log "both NICs present"; exit 0; fi
   local tries; tries=$(cat "$STATE/attempts" 2>/dev/null || echo 0)
   log "only $n of $EXPECT NICs present (failed link training); recovery attempt $((tries + 1))"
-  cycle
-  if [ "$(nic_count)" -ge "$EXPECT" ]; then echo 0 > "$STATE/attempts"; log "recovered without reboot"; exit 0; fi
   if [ "$tries" -ge 2 ]; then log "giving up after $tries reboots; needs a power cut"; exit 1; fi
   echo $((tries + 1)) > "$STATE/attempts"; sync
   # A sky1 default boot that reached userspace counts as up: clear GRUB's pending mark so the
   # recovery reboot doesn't fall back to Armbian. (Test boots, sky1test=acpi|dt, are skipped by the unit.)
   grep -q 'sky1test=default' /proc/cmdline && command -v grub-editenv >/dev/null && grub-editenv - set sky1_pending=0
+  arm_fallback 180
   log "rebooting (the shutdown hook power-cycles the NICs just before reset)"
   systemctl reboot
 }
@@ -189,19 +230,15 @@ case "${1:-}" in
   on) power on ;;
   recover) recover ;;
   selftest)
+    # Proves the GPIO really switches the NIC rails (root-port links drop while off, rootfs unaffected),
+    # then reboots so the firmware trains the freshly powered NICs. Check serial.log for
+    # "Root Port 2/3: Link Up Success" and this log after the reboot.
     OUT=/var/log/opi6-nic-selftest.txt
-    { echo "== $(date -Is) selftest on $(uname -r)"; probe; } > "$OUT" 2>&1
-    cycle "$OFF_SECS" >> "$OUT" 2>&1
-    for i in $(seq 1 60); do
-      [ "$(nic_count)" -ge "$EXPECT" ] && [ -n "$(ip -4 route show default)" ] && break; sleep 1
-    done
-    { echo "== after ${i}s: $(nic_count) NICs, default route: $(ip -4 route show default | head -1)"; ip -br link; } >> "$OUT" 2>&1
-    if [ "$(nic_count)" -ge "$EXPECT" ] && [ -n "$(ip -4 route show default)" ]; then
-      echo "== PASS: NICs power-cycled and came back without a reboot" >> "$OUT"
-    else
-      echo "== NICs not back after 60 s; rebooting (they were just power-cycled, so firmware should train them)" >> "$OUT"
-      sync; systemctl reboot
-    fi ;;
+    { echo "== $(date -Is) selftest on $(uname -r)"; probe; } > "$OUT" 2>&1; sync
+    arm_fallback 90
+    CHECK_OFF=1 cycle "$OFF_SECS" || note "cycle failed"
+    note "rebooting now (fallback timer forces it if this hangs)"
+    systemctl reboot ;;
   shutdown-hook)
     # systemd-shutdown runs this after all services stopped, before the kernel's reboot().
     [ "${2:-}" = reboot ] || exit 0
