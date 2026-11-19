@@ -28,7 +28,7 @@
       the same as the first kernel-7 boot. From kernel-7: `post/0003` returns IRQ_NONE for such interrupts, disables
       the line after 64 in a row and rate-limits AER logging; `post/0004` clears local errors latched during PHY
       bring-up (masked from the local IRQ, so nothing else cleared them).
-- [x] With the fixes (f0c8401): 1 h load tests (kernel build at -j6, then `stress-ng --vm 6 --cpu 6`) at 6000 and
+- [x] With the fixes (323a39d): 1 h load tests (kernel build at -j6, then `stress-ng --vm 6 --cpu 6`) at 6000 and
       6400 MT/s, 0 resets, 0 ECC errors, no AER storm, peak 70 °C. RAM speed was not the cause.
 - [x] A reset 2 min after a build left every `.ko` zero-length (ext4 delayed allocation, caught by `install.sh
       verify`). Build and stage now `sync`.
