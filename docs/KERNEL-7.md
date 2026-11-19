@@ -142,6 +142,20 @@ Orion O6 / Sky1 XCP boards.
     on by default in 7.x). `bench/cpu-diag.sh` records topology, governor and frequencies and runs
     the benchmark as booted, with LLC balancing off, with the performance governor, and pinned to
     the biggest cores. Run it on both kernels and compare.
+- The AER storm also shows up now and then on 6.18.64, right after "waiting PHY is ready! retries =
+  1", with `dev_sts 0x3950` repeated (DEVCTL 0x3950, DEVSTA 0: no error bits). So it is latent in
+  the shared Sky1 PCIe driver, not a 7.x core change. Likely cause (from reading the code, not yet
+  confirmed on the board): the driver masks the AER-class local errors (PHY error, replay timeouts,
+  FC and completion errors) from the local IRQ, and only the local IRQ handler ever clears
+  `I_LOCAL_ERR_STS_REG0`. A PHY error latched during the PHY retry is never cleared, while the AER
+  handler only clears the AER capability registers, which are empty. `0049` clears stale local
+  errors before the interrupts are enabled, and clears and names any latched local error when an
+  AER interrupt finds the AER registers empty. If the storm comes back, the log now says
+  `local err0 <name> latched, cleared`, which confirms this, or shows `spurious AER irq` lines if
+  the source is something else. `0045` stays as the backstop.
+- Also seen, not changed: when the old handler re-enables root error reporting it writes to the
+  PCIe capability offset instead of the AER offset, so after the first handled AER interrupt the
+  root port's error reporting stays off.
 - Not done yet: an hour of load and stability testing on 7.3.5.
 
 ## Testing on the board
