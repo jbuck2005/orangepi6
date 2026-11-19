@@ -105,7 +105,7 @@ build() {
   say "build (-j${JOBS:-6}, 20-60 min)"
   "$REPO/scripts/03-build.sh" > "$WORK/build.log.tail" 2>&1 || { tail -30 "$WORK/build.log"; die "build failed (see $WORK/build.log)"; }
   [ -f "$WORK/linux-$KV/arch/arm64/boot/Image" ] || die "no Image after build"
-  ok "kernel built"
+  ok "kernel built (03-build.sh synced it to disk)"
 }
 
 stage() {
@@ -114,6 +114,7 @@ stage() {
   [ "$(uname -r)" != "$KV-sky1" ] || die "running $KV-sky1: boot Armbian's kernel for this step
          (sudo grub-reboot \"\$(grep -m1 -oP \"menuentry '\\KArmbian[^']*\" /boot/grub/grub.cfg)\" && sudo reboot)"
   sudo WORK="$WORK" bash "$REPO/scripts/install.sh" stage
+  sync
 }
 
 default_() {

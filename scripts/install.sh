@@ -195,6 +195,7 @@ stage() {
   install -m755 "$REPO/scripts/boot-report.sh" /usr/local/sbin/sky1-boot-report
   install -m644 "$REPO/systemd/sky1-boot-report.service" /etc/systemd/system/
   systemctl daemon-reload; systemctl enable -q sky1-boot-report.service
+  sync   # modules, /boot/sky1 and the initrd must be on disk before anyone reboots
   verify
 }
 
