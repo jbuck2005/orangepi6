@@ -49,7 +49,7 @@ cd orangepi6
 scripts/setup.sh
 ```
 `setup.sh` checks the board and firmware, installs the build tools and Mesa from the Ubuntu archive, fetches Linux
-6.18.14 from kernel.org (and checks Greg Kroah-Hartman's signature), applies the Sky1-Linux patches and this repo's
+6.18.64 (the version in `kernel.conf`) from kernel.org (and checks Greg Kroah-Hartman's signature), applies the Sky1-Linux patches and this repo's
 non-Plus device tree, and builds the kernel (`-j6`, 20 minutes to an hour). It then installs the kernel into `/boot/sky1/`
 and makes it the GRUB default. Every step is checked, and the script stops with a clear message on the first failure.
 Re-running it skips steps that are already done.

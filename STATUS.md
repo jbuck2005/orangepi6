@@ -11,6 +11,13 @@
 - [ ] Device-tree boot (`arm dt`): not needed for the GPU after all, since the Sky1 patches power the GPU in ACPI mode
 - [x] sky1 is the default boot (`install.sh default`), with automatic fallback to Armbian
 
+## Kernel 6.18.64 LTS (branch lts-6.18)
+- [x] The Sky1-Linux 6.18.14 patches rebased onto 6.18.64 with a 3-way merge. 134 of 139 apply unchanged; 5 are
+      refreshed in `patches/6.18.64/` (conflicts in alc269 audio, macb ACPI ID includes and arm_scmi ACPI resolved by
+      hand; 0011 irqchip/iommu and 0118 smmu-v3 merged without conflicts). Patching is strict: no fuzz.
+- [x] Cross-compiled for arm64 (Image, modules, DTBs) without errors
+- [ ] Board test: stage, test boot, `setup.sh check`
+
 ### What it took (all checked by `install.sh verify`)
 - The initramfs must be built with a clean environment. The toolchain's `LD_LIBRARY_PATH` made
   `copy_exec` pack libcrypto under the build tree, so modprobe/udevd failed and init exited.
