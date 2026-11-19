@@ -14,6 +14,8 @@
 #     "entity": "switch.<plug>", "offSeconds": 30 }
 #   { "type": "shelly", "host": "<plug address>", "user": "", "password": "", "offSeconds": 30 }
 #   "type": "tasmota" works like shelly.
+#   { "type": "ssh", "host": "zeus", "command": "orangepi6/tools/plug-powercycle.sh" }
+#     runs the power cycle on another machine that can reach the plug (needs non-interactive ssh).
 #
 #   pwsh -File plug-watch.ps1 -Once                 # one power cycle now
 #   pwsh -File plug-watch.ps1 [-Log <serial.log>]   # watch the serial log and cycle on link-training failure
@@ -59,6 +61,15 @@ function Invoke-PowerCycle {
         $msg | Add-Content -Path $Log -Encoding utf8; Write-Host $msg -ForegroundColor Red
         try { [console]::beep(880, 1500) } catch {}
         throw 'power not restored'
+      }
+    }
+    'ssh' {
+      & ssh -o BatchMode=yes -o ConnectTimeout=10 $cfg.host $cfg.command
+      if ($LASTEXITCODE -ne 0) {
+        $msg = "=== $(Get-Date -Format s) plug-watch: *** remote power cycle on $($cfg.host) FAILED (exit $LASTEXITCODE); aiPi may be OFF ***"
+        $msg | Add-Content -Path $Log -Encoding utf8; Write-Host $msg -ForegroundColor Red
+        try { [console]::beep(880, 1500) } catch {}
+        throw 'remote power cycle failed'
       }
     }
     default { throw "unknown plug type '$($cfg.type)'" }
