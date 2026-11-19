@@ -28,7 +28,9 @@
   no network at all, even on Armbian. Serial log (40 firmware boots, 2026-11-17..19): 5 failures, every one right
   after a sky1 session, both ports `Ltssm State:40C80` = Polling.Compliance (receiver detected, NIC silent).
   Empty ports read 40080 = Detect.Quiet. A 30 s power-off fixes it. The NIC rails are switched by GPIO038/039
-  (S5 GPIO0 lines 27/28, schematic p19-20), so `scripts/nic-power.sh` power-cycles them from software.
+  (S5 GPIO0 lines 27/28, schematic p19-20; firmware drives them as outputs, high). Switching them from
+  Armbian through /dev/mem froze the board twice, so `scripts/nic-power.sh` is experimental and gated.
+  Supported workaround: a local smart plug driven by `tools/plug-watch.ps1` from the serial log.
 
 ## Phase 2: NPU (next)
 - Leads: [visorcraft/orange-pi-6-plus-npu](https://github.com/visorcraft/orange-pi-6-plus-npu), [Sky1-Linux/sky1-drivers-dkms](https://github.com/Sky1-Linux/sky1-drivers-dkms).

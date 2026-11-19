@@ -78,10 +78,13 @@ scripts/gpu-test.sh           # optional: vulkaninfo, glmark2, vkmark
 ## Known issues
 - **Network ports missing after a reboot:** the firmware sometimes fails PCIe link training for the RTL8125s on a
   warm reboot (`ip -br link` shows only `lo`; the serial console shows `Root Port 2/3: Link Up Fail,Ltssm State:40C80`).
-  It happens on both the V0.8 and the 2026-10-19 firmware, and only after a session that used the NICs. The board can
-  switch each NIC's 3.3 V rail from software (GPIO038/GPIO039), so `sudo scripts/nic-power.sh install` power-cycles
-  the NICs just before every reboot and, if a boot still comes up without them, power-cycles them and reboots
-  (at most twice). Without it, cut the power for about 30 s. `scripts/nic-power.sh probe` shows the state.
+  It happens on both the V0.8 and the 2026-10-19 firmware, and only after a session that used the NICs. The fix is
+  cutting the power for about 30 s. To automate it, put aiPi on a smart plug with a local HTTP API (Shelly Gen2+/Gen3
+  with its cloud switched off, or a Tasmota plug) and run `tools/plug-watch.ps1` on the PC that logs the serial
+  console: it power-cycles the board when the firmware reports the failure (at most 3 times an hour), and
+  `-Once` does a cycle by hand. `tools/plug-powercycle.sh` does a single cycle from Linux. The plug's address
+  and password live in a JSON file outside the repo. (`scripts/nic-power.sh`, which switches the NIC rails
+  through GPIO038/039, is experimental: it froze the board under Armbian.)
 - **LLMs on the GPU:** llama.cpp's Vulkan backend on panvk generates text at only ~1.7 tok/s, and prompt processing
   fails with `ErrorOutOfDeviceMemory`. Use the CPU for now: Qwen2.5-1.5B Q4 runs at ~124 tok/s for prompts and ~37 tok/s
   for generation, and 7B at ~34/9 tok/s. In a Vulkan build, pass `-dev none`.

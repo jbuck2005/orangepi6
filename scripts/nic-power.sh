@@ -18,6 +18,11 @@
 # Under the sky1 kernel (S5 GPIO driver bound) it uses gpioset/gpioget on that chip. Under Armbian's generic
 # kernel (no driver) it writes the registers through /dev/mem, touching only lines 27 and 28.
 #
+# STATUS (2026-11-19): EXPERIMENTAL, DO NOT INSTALL. Under Armbian, writing these registers through
+# /dev/mem froze the board twice (once cutting both lines, once before the first logged step). Only
+# `probe` runs by default; everything that writes needs NIC_POWER_EXPERIMENTAL=1. Untested: the sky1
+# path through the kernel GPIO driver (gpioset). The supported fallback is tools/plug-watch.ps1.
+#
 # Usage (as root):
 #   nic-power.sh probe                 read-only: registers, pad mux, NICs, PCIe state
 #   nic-power.sh cycle [SECONDS]       remove the NIC PCI devices, cut power, restore it (reboot afterwards!)
@@ -307,6 +312,11 @@ recover() {
   systemctl reboot
 }
 
+case "${1:-}" in
+  probe) probe; exit ;;
+  cycle|on|recover|selftest|shutdown-hook|install)
+    [ "${NIC_POWER_EXPERIMENTAL:-0}" = 1 ] || die "experimental: writing the NIC power GPIOs froze the board under Armbian; see the header" ;;
+esac
 case "${1:-}" in
   probe) probe ;;
   cycle) cycle "${2:-$OFF_SECS}" ;;
