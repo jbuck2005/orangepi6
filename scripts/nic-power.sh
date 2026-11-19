@@ -140,21 +140,27 @@ probe() {
   M=$(mask)
   echo "== kernel $(uname -r)"
   echo "== /proc/iomem owners near S5 GPIO / iomux"; grep -iE '^ *1600[47]' /proc/iomem || echo "  (none: no kernel driver owns them)"
-  echo "== S5 GPIO0 @ $GPIO_BASE (lines $LINES = GPIO038/GPIO039)"
-  for o in 0x00:bypass 0x04:dir_in 0x08:out_en 0x0c:out 0x10:in; do
-    v=$(mem read "$(reg ${o%%:*})") || die "/dev/mem read failed (CONFIG_STRICT_DEVMEM?)"
-    printf '  %-7s %s ' "${o#*:}" "$v"; for l in $LINES; do printf ' line%s=%d' "$l" $(( (v >> l) & 1 )); done; echo
-  done
-  echo "  expect: in line27=1 line28=1 (pulled up = NICs powered)"
-  echo "== pad mux (function bits 8:7, 0 = GPIO)"
-  for p in $PADS; do v=$(mem read "$(printf '0x%x' $(( PAD_BASE + p )))"); printf '  pad +%s = %s  func=%d\n' "$p" "$v" $(( (v >> 7) & 3 )); done
+  local chip; chip=$(gpio_chip)
+  if [ -n "$(iomem_owner 16004000)" ]; then
+    # Driver-owned (sky1): no /dev/mem access at all; ask libgpiod instead.
+    echo "== S5 GPIO0 lines $LINES via ${chip:-?} (driver-owned, registers not read)"
+    command -v gpioinfo >/dev/null && { gpioinfo -c "$chip" 2>/dev/null || gpioinfo "$chip"; } 2>/dev/null | grep -E 'line +2[78]:'
+  else
+    echo "== S5 GPIO0 @ $GPIO_BASE (lines $LINES = GPIO038/GPIO039)"
+    for o in 0x00:bypass 0x04:dir_in 0x08:out_en 0x0c:out 0x10:in; do
+      v=$(mem read "$(reg ${o%%:*})") || die "/dev/mem read failed (CONFIG_STRICT_DEVMEM?)"
+      printf '  %-7s %s ' "${o#*:}" "$v"; for l in $LINES; do printf ' line%s=%d' "$l" $(( (v >> l) & 1 )); done; echo
+    done
+    echo "  expect: in line27=1 line28=1 (pulled up = NICs powered)"
+    echo "== pad mux (function bits 8:7, 0 = GPIO)"
+    for p in $PADS; do v=$(mem read "$(printf '0x%x' $(( PAD_BASE + p )))"); printf '  pad +%s = %s  func=%d\n' "$p" "$v" $(( (v >> 7) & 3 )); done
+  fi
   echo "== S5 GPIO0 owner: $(iomem_owner 16004000) -> chip: $(gpio_chip || echo 'none (registers via /dev/mem)')  gpioset: $(command -v gpioset || echo missing)"
-  command -v gpioinfo >/dev/null && gpioinfo 2>/dev/null | grep -iE 'chip|line +2[78]:' | head -20
   echo "== RTL8125 PCI functions ($(nic_count) of $EXPECT)"
   for b in $(nic_bdfs); do echo "  $b driver=$(basename "$(readlink -f /sys/bus/pci/devices/$b/driver 2>/dev/null)" 2>/dev/null) net=$(ls /sys/bus/pci/devices/$b/net 2>/dev/null | tr '\n' ' ')"; done
   echo "== default route via: $(ip -4 route show default 2>/dev/null | awk '{print $5}' | head -1)"
   echo "== pci tree"; command -v lspci >/dev/null && lspci -tv 2>/dev/null | head -30
-  echo "== sky1-pcie link state"; for f in /sys/kernel/debug/*sky1*/link_status /sys/kernel/debug/*/*sky1*/link_status; do [ -r "$f" ] && echo "  $f: $(cat "$f")"; done 2>/dev/null
+  echo "== PCIe links"; for d in /sys/bus/pci/devices/*; do [ -r "$d/current_link_speed" ] && [ "$(cat "$d/class")" = 0x060400 ] && echo "  ${d##*/} $(cat "$d/current_link_speed") x$(cat "$d/current_link_width")"; done 2>/dev/null
   dmesg 2>/dev/null | grep -iE 'sky1-pcie\.[34].*(link|fail)|PCIe link down' | tail -6
 }
 
