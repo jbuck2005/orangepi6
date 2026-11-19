@@ -43,24 +43,41 @@ die() { log "ERROR: $*"; exit 1; }
 [ "$(id -u)" = 0 ] || die "run as root"
 command -v python3 >/dev/null || die "python3 is needed for /dev/mem access"
 
-# mem OP ARGS: tiny /dev/mem helper. read ADDR | rmw ADDR CLEARMASK SETMASK
+# mem OP ARGS: tiny /dev/mem helper.
+#   read ADDR | rmw ADDR CLEARMASK SETMASK  -> prints "BEFORE AFTER ok|OTHER-BITS-CHANGED"
+#   uart TEXT                               -> writes TEXT to the debug UART (PL011 @ UART_BASE)
 mem() {
   python3 -I - "$@" <<'PY'
-import mmap, os, struct, sys
-op, addr = sys.argv[1], int(sys.argv[2], 0)
-page = addr & ~0xfff
-fd = os.open("/dev/mem", os.O_RDWR | os.O_SYNC)
-m = mmap.mmap(fd, 0x1000, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset=page)
-o = addr - page
+import mmap, os, struct, sys, time
+op = sys.argv[1]
+def mapping(addr):
+    page = addr & ~0xfff
+    fd = os.open("/dev/mem", os.O_RDWR | os.O_SYNC)
+    return fd, mmap.mmap(fd, 0x1000, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE, offset=page), addr - page
+if op == "uart":
+    fd, m, o = mapping(int(os.environ["UART_BASE"], 0))
+    for ch in (sys.argv[2] + "\r\n").encode("ascii", "replace"):
+        t = time.time()
+        while struct.unpack_from("<I", m, o + 0x18)[0] & 0x20 and time.time() - t < 0.05:  # FR.TXFF
+            pass
+        struct.pack_into("<I", m, o, ch)
+    sys.exit()
+addr = int(sys.argv[2], 0)
+fd, m, o = mapping(addr)
 v = struct.unpack_from("<I", m, o)[0]
 if op == "rmw":
-    v = (v & ~int(sys.argv[3], 0)) | int(sys.argv[4], 0)
-    struct.pack_into("<I", m, o, v & 0xffffffff)
-    v = struct.unpack_from("<I", m, o)[0]
-print("0x%08x" % v)
-m.close(); os.close(fd)
+    clr, st = int(sys.argv[3], 0), int(sys.argv[4], 0)
+    w = ((v & ~clr) | st) & 0xffffffff
+    struct.pack_into("<I", m, o, w)
+    a = struct.unpack_from("<I", m, o)[0]
+    allowed = clr | st
+    print("0x%08x 0x%08x %s" % (v, a, "ok" if (a ^ v) & ~allowed == 0 else "OTHER-BITS-CHANGED"))
+else:
+    print("0x%08x" % v)
 PY
 }
+UART_BASE=${UART_BASE:-0x040d0000}   # UART2, the DEBUG header (firmware has no SPCR, so Armbian leaves it alone)
+export UART_BASE
 reg() { printf '0x%x' $(( GPIO_BASE + $1 )); }
 mask() { local m=0 l; for l in $LINES; do m=$(( m | (1 << l) )); done; printf '0x%x' $m; }
 
@@ -74,7 +91,11 @@ nic_count() { nic_bdfs | wc -l; }
 
 pads_to_gpio() {  # make sure GPIO038/039 pads are muxed to GPIO (function 0)
   local p
-  for p in $PADS; do mem rmw $(printf '0x%x' $(( PAD_BASE + p ))) 0x180 0 >/dev/null || return 1; done
+  for p in $PADS; do
+    v=$(mem read "$(printf '0x%x' $(( PAD_BASE + p )))") || return 1
+    [ $(( (v >> 7) & 3 )) = 0 ] && continue          # already GPIO: no write
+    note "write pad +$p: function -> GPIO"; note "  $(mem rmw "$(printf '0x%x' $(( PAD_BASE + p )))" 0x180 0)"
+  done
 }
 
 # Under the sky1 kernel the S5 GPIO and iomux blocks are owned by kernel drivers, so go through
@@ -120,18 +141,49 @@ power() {  # power off SECS (cut, wait, restore) | power on
       # Reading the lines requests them as inputs: the pull-ups switch the rails back on.
       if gpiod_v2; then gpioget -c "$chip" "${inargs[@]}" >/dev/null; else gpioget "$chip" "${inargs[@]}" >/dev/null; fi ;;
     mem)
-      if [ "$1" = off ]; then
-        driver_bound 16007000 || { pads_to_gpio || return 1; }
-        mem rmw "$(reg 0x00)" "$M" 0  >/dev/null &&   # GPIO mode (clear bypass)
-        mem rmw "$(reg 0x0c)" "$M" 0  >/dev/null &&   # output value 0
-        mem rmw "$(reg 0x08)" 0 "$M"  >/dev/null &&   # output enable
-        mem rmw "$(reg 0x04)" "$M" 0  >/dev/null ||   # direction = output -> pads low -> rails off
-          { mem rmw "$(reg 0x04)" 0 "$M" >/dev/null; return 1; }
-        sleep "$2"
-      fi
-      mem rmw "$(reg 0x04)" 0 "$M" >/dev/null ;;      # direction = input -> pull-ups -> rails on
+      [ "$1" = off ] || { mem_restore; return; }
+      driver_bound 16007000 || { pads_to_gpio || return 1; }
+      mem_cut || { mem_restore; return 1; }
+      sleep "$2"
+      mem_restore ;;
     *) log "cannot drive GPIO038/039: ${mode#none }"; return 1 ;;
   esac
+}
+
+# /dev/mem path. Firmware leaves GPIO038/039 as outputs driven high; the sky1 GPIO driver leaves them
+# as inputs (pull-ups). Either way: snapshot the registers, change only the bits of $LINES, log every
+# write before and after it (to the UART too, in case the system dies), and restore the exact snapshot.
+mem_snapshot() {
+  [ -s /run/opi6-nic.snap ] && return 0   # keep the first (pre-cut) snapshot
+  echo "$(mem read "$(reg 0x00)") $(mem read "$(reg 0x04)") $(mem read "$(reg 0x08)") $(mem read "$(reg 0x0c)")" > /run/opi6-nic.snap
+  note "snapshot bypass/dir/out_en/out: $(cat /run/opi6-nic.snap)"
+}
+mem_write() {  # mem_write NAME OFFSET CLEAR SET
+  note "write $1 (+$2): clear $3 set $4"
+  local r; r=$(mem rmw "$(reg "$2")" "$3" "$4") || { note "  write FAILED"; return 1; }
+  note "  $1 before/after: $r"
+  case "$r" in *OTHER-BITS-CHANGED*) return 1 ;; esac
+}
+mem_cut() {
+  local M; M=$(mask)
+  mem_snapshot || return 1
+  read -r byp dir oe out < /run/opi6-nic.snap
+  if [ $(( byp & M )) != 0 ]; then mem_write bypass 0x00 "$M" 0 || return 1; fi
+  mem_write out 0x0c "$M" 0 || return 1                     # if already outputs: rails go off here
+  if [ $(( oe & M )) != $(( M )) ]; then mem_write out_en 0x08 0 "$M" || return 1; fi
+  if [ $(( dir & M )) != 0 ]; then mem_write dir 0x04 "$M" 0 || return 1; fi   # inputs -> outputs (low)
+  note "rails should be off now"
+}
+mem_restore() {  # put bits of $LINES back exactly as snapshotted (dir first, so a released line floats high)
+  local M; M=$(mask)
+  [ -s /run/opi6-nic.snap ] || { note "no snapshot; driving lines high"; mem_write out 0x0c 0 "$M"; return; }
+  read -r byp dir oe out < /run/opi6-nic.snap
+  mem_write dir 0x04 "$M" $(( dir & M ))
+  mem_write out 0x0c "$M" $(( out & M ))
+  mem_write out_en 0x08 "$M" $(( oe & M ))
+  mem_write bypass 0x00 "$M" $(( byp & M ))
+  rm -f /run/opi6-nic.snap
+  note "restored"
 }
 
 detach_nics() {  # unbind and remove the NIC PCI functions so nothing touches them while unpowered
@@ -161,7 +213,16 @@ else:
     print("?")
 PY
 }
-note() { log "$*"; [ -n "${OUT:-}" ] && { echo "$(date +%T) $*" >> "$OUT"; sync; }; return 0; }
+# Selftest notes go to /run (tmpfs), the kernel log and, when nothing has the UART, straight to the
+# debug UART, so they reach the serial log even if the disk or the kernel dies. Never to disk mid-test.
+note() {
+  log "$*"
+  [ -n "${OUT:-}" ] || return 0
+  echo "$(date +%T) $*" >> "$OUT"
+  echo "<4>$LOGTAG: $*" > /dev/kmsg 2>/dev/null
+  [ "${SERIAL_NOTES:-0}" = 1 ] && mem uart "[opi6-nic $(date +%T)] $*" 2>/dev/null
+  return 0
+}
 
 # Independent fallback, armed before anything is touched: if this script, a PCI operation or the
 # normal reboot path hangs, force an immediate reboot (sysrq 'b' skips device shutdown).
@@ -252,16 +313,19 @@ case "${1:-}" in
   on) power on ;;
   recover) recover ;;
   selftest)
-    # Proves the GPIO really switches the NIC rails (root-port links drop while off, rootfs unaffected),
-    # then reboots so the firmware trains the freshly powered NICs. Check serial.log for
-    # "Root Port 2/3: Link Up Success" and this log after the reboot.
-    OUT=/var/log/opi6-nic-selftest.txt
-    { echo "== $(date -Is) selftest on $(uname -r)"; probe; } > "$OUT" 2>&1; sync
-    # Preflight before arming anything: if the GPIO path isn't usable, nothing is touched and no reboot.
+    # selftest [LINES]: e.g. "selftest 28" cuts only GPIO039. Proves the GPIO switches the NIC rails
+    # (root-port links drop while off, rootfs unaffected), then reboots so the firmware trains the
+    # freshly powered NICs. Progress goes to the serial log as "[opi6-nic ...]" lines.
+    [ -n "${2:-}" ] && LINES=$2
+    OUT=/run/opi6-nic-selftest.txt
+    { echo "== $(date -Is) selftest on $(uname -r), lines $LINES"; probe; } > "$OUT" 2>&1
+    driver_bound "$(printf '%x' "$UART_BASE" | sed 's/^/0/')" || SERIAL_NOTES=1
     m=$(gpio_mode); case "$m" in gpiod*|mem) ;; *) note "selftest aborted, nothing touched: ${m#none }"; exit 1 ;; esac
+    note "selftest start, lines $LINES, path $m"
     arm_fallback 90
     CHECK_OFF=1 cycle "$OFF_SECS"; rc=$?
     [ $rc = 0 ] || note "cycle failed (rc=$rc)"
+    cp "$OUT" /var/log/opi6-nic-selftest.txt 2>/dev/null; sync
     note "rebooting now (fallback timer forces it if this hangs)"
     systemctl reboot ;;
   shutdown-hook)
