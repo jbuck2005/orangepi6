@@ -23,6 +23,11 @@
       Benchmarks match 6.18.14: vkpeak FP32 1205 GFLOPS, vkmark 3544.
 - [x] netconsole warned once at boot ("exceeded budget in poll"): the r8125 "other" MSI-X vector reported work at
       netpoll's budget of 0. Fixed in `patches/6.18.64/post/0002`.
+- [ ] Two silent resets under -j6 build load on 6.18.64 (none seen on 6.18.14 or Armbian 6.18.45). One later boot
+      showed a sky1-pcie AER interrupt storm with nothing latched, right after "waiting PHY is ready! retries = 1",
+      the same as the first kernel-7 boot. From kernel-7: `post/0003` returns IRQ_NONE for such interrupts, disables
+      the line after 64 in a row and rate-limits AER logging; `post/0004` clears local errors latched during PHY
+      bring-up, the likely source. Whether the storm causes the resets is not yet known; retest pending.
 
 ### What it took (all checked by `install.sh verify`)
 - The initramfs must be built with a clean environment. The toolchain's `LD_LIBRARY_PATH` made
