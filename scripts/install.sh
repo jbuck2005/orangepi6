@@ -168,6 +168,13 @@ stage() {
     make -C "$SRC" HOSTCC="$HOSTCC" CC="$CC" -s modules_install
   fi
   depmod "$KREL"
+  # /boot/sky1 holds one kernel, so module trees of other sky1 releases (e.g. after a kernel
+  # update) are unused. stage runs from Armbian's kernel, so none of them is the running one.
+  local old
+  for old in "$MODROOT"/lib/modules/*-sky1 "$MODROOT"/lib/modules/*-sky1+; do
+    [ -d "$old" ] && [ "${old##*/}" != "$KREL" ] && [ "${old##*/}" != "$(uname -r)" ] || continue
+    rm -rf "$old"; ok "removed old modules ${old##*/}"
+  done
   install -d "$BOOTDIR"
   install -m644 "$SRC/arch/arm64/boot/Image" "$BOOTDIR/vmlinuz"
   install -m644 "$SRC/arch/arm64/boot/dts/cix/$DTB_NAME" "$BOOTDIR/$DTB_NAME"

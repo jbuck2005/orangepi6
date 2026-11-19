@@ -3,8 +3,9 @@
 An open GPU stack for the **Orange Pi 6** (non-Plus: 90x90 mm board, CIX P1 / CD8180, Mali-G720, 2x RTL8125),
 on Armbian userspace.
 
-- Kernel: Linux **6.18.14** from kernel.org plus the [Sky1-Linux/linux-sky1](https://github.com/Sky1-Linux/linux-sky1)
-  LTS patches (commit `57e018a`), built on the board. It boots in the firmware's **ACPI** mode.
+- Kernel: Linux **6.18.64** (6.18 LTS) from kernel.org plus the [Sky1-Linux/linux-sky1](https://github.com/Sky1-Linux/linux-sky1)
+  LTS patches (commit `57e018a`, made for 6.18.14; the 5 that needed rebasing for 6.18.64 are in
+  [patches/6.18.64/](patches/6.18.64/)), built on the board. The version is set in [kernel.conf](kernel.conf). It boots in the firmware's **ACPI** mode.
 - GPU: mainline **panthor**, with Mesa from Ubuntu 26.04: **panvk** (Vulkan 1.4) and **Panfrost** (GLES 3.1).
 - No CIX vendor kernel and no closed Mali (`mali_kbase` / `libmali`) stack.
 - Armbian's own kernel stays installed as entry 0 in GRUB and as an automatic fallback.
