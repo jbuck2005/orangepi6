@@ -23,7 +23,7 @@ WORK=${WORK:-$HOME/sky1-build}
 export WORK
 # shellcheck disable=SC1091
 . "$REPO/kernel.conf"
-RELEASE_TAG=${RELEASE_TAG:-v2026.11.19}
+RELEASE_TAG=${RELEASE_TAG:-v2026.11.19.1}
 RELEASE_URL=${RELEASE_URL:-https://github.com/jbuck2005/orangepi6/releases/download/$RELEASE_TAG}
 STEPS="preflight packages source build stage default"
 if [ "${1:-}" = --prebuilt ]; then PREBUILT=1; shift; set -- "${1:-all}"; fi
