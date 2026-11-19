@@ -1,0 +1,103 @@
+From: jbuck2005 <59450931+jbuck2005@users.noreply.github.com>
+Subject: [PATCH] irqchip/sky1-pdc, PCI: sky1: use the struct syscore API
+
+6.18.64 has the stable backport of the syscore rework: the callbacks take a
+void *data argument and drivers register a struct syscore with
+register_syscore(). Convert the two Sky1 users the same way the Sky1-Linux
+6.19 track (patches-latest/) does.
+
+---
+--- a/drivers/irqchip/irq-sky1-pdc.c
++++ b/drivers/irqchip/irq-sky1-pdc.c
+@@ -19,21 +19,24 @@
+ 	void __iomem            *pdc_base;
+ };
+ 
+-static int pdcv1_wakeup_source_save(void)
++static int pdcv1_wakeup_source_save(void *data)
+ {
+ 	return 0;
+ }
+ 
+-static void pdcv1_wakeup_source_restore(void)
++static void pdcv1_wakeup_source_restore(void *data)
+ {
+-	return;
+ }
+ 
+-static struct syscore_ops sky1_pdc_syscore_ops = {
++static const struct syscore_ops sky1_pdc_syscore_ops = {
+ 	.suspend        = pdcv1_wakeup_source_save,
+ 	.resume         = pdcv1_wakeup_source_restore,
+ };
+ 
++static struct syscore sky1_pdc_syscore = {
++	.ops = &sky1_pdc_syscore_ops,
++};
++
+ static int sky1_pdc_irq_set_wake(struct irq_data *d, unsigned int on)
+ {
+ 	struct pdcv1_irqchip_data *cd = d->chip_data;
+@@ -191,7 +194,7 @@
+ 	cix_domain = domain;
+ 	pr_info("sky1_pdc: domain created successfully for %pOF\n", node);
+ 
+-	register_syscore_ops(&sky1_pdc_syscore_ops);
++	register_syscore(&sky1_pdc_syscore);
+ 
+ 	/*
+ 	 * Clear the OF_POPULATED flag set in of_irq_init so that
+@@ -235,7 +238,7 @@
+ 	irq_set_default_domain(domain);
+ 	cix_domain = domain;
+ 
+-	register_syscore_ops(&sky1_pdc_syscore_ops);
++	register_syscore(&sky1_pdc_syscore);
+ 
+ 	return 0;
+ }
+--- a/drivers/pci/controller/cadence/pci-sky1.c
++++ b/drivers/pci/controller/cadence/pci-sky1.c
+@@ -2387,7 +2387,7 @@
+ 	return 0;
+ }
+ 
+-static void sky1_pcie_syscore_op_shutdown(void)
++static void sky1_pcie_syscore_op_shutdown(void *data)
+ {
+ 	struct sky1_pcie *pcie;
+ 
+@@ -2396,10 +2396,14 @@
+ 	}
+ }
+ 
+-static struct syscore_ops sky1_pcie_syscore_ops = {
++static const struct syscore_ops sky1_pcie_syscore_ops = {
+ 	.shutdown = sky1_pcie_syscore_op_shutdown,
+ };
+ 
++static struct syscore sky1_pcie_syscore = {
++	.ops = &sky1_pcie_syscore_ops,
++};
++
+ static void sky1_pcie_x211_enum_lock(struct sky1_pcie *pcie, bool lock)
+ {
+ 	if (sky1_pcie_is_x211(pcie)) {
+@@ -2560,7 +2564,7 @@
+ 	mutex_lock(&sky1_init_mutex);
+ 	/* Register for syscore ops only when first instance probed */
+ 	if (list_empty(&sky1_pcie_list))
+-		register_syscore_ops(&sky1_pcie_syscore_ops);
++		register_syscore(&sky1_pcie_syscore);
+ 
+ 	/*
+ 	 * Add the qcom_pcie list of each PCIe instance probed to
+@@ -2761,7 +2765,7 @@
+ 	if (pcie->is_probe) {
+ 		list_del(&pcie->list);
+ 		if (list_empty(&sky1_pcie_list))
+-			unregister_syscore_ops(&sky1_pcie_syscore_ops);
++			unregister_syscore(&sky1_pcie_syscore);
+ 	}
+ }
+ 

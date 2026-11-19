@@ -6,7 +6,9 @@
 # Usage: WORK=... scripts/package-release.sh <tag>      e.g. v2026.11.19
 set -euo pipefail
 REPO=$(cd "$(dirname "$0")/.." && pwd)
-WORK=${WORK:-$HOME/sky1-build}; KV=6.18.14
+WORK=${WORK:-$HOME/sky1-build}
+# shellcheck disable=SC1091
+. "$REPO/kernel.conf"; . "$REPO/scripts/lib-patch.sh"
 TAG=${1:?release tag}
 SRC=$WORK/linux-$KV
 KREL=$(cat "$SRC/include/config/kernel.release")
@@ -27,7 +29,7 @@ cp -p "$SRC/arch/arm64/boot/dts/cix/sky1-orangepi-6.dtb" "$STAGE/arch/arm64/boot
 cp -p "$SRC/arch/arm64/boot/Image" "$STAGE/arch/arm64/boot/Image"   # last, so it stays newer than .config
 cat > "$STAGE/BUILDINFO" <<EOF
 kernel: $KREL (kernel.org $KV, signature verified at fetch time)
-patches: Sky1-Linux/linux-sky1 $(git -C "$WORK/linux-sky1" rev-parse --short HEAD) (patches/, config/config.sky1)
+patches: Sky1-Linux/linux-sky1 $(git -C "$WORK/linux-sky1" rev-parse --short HEAD) ($SKY1_PATCHES/, config/$SKY1_CONFIG)${SKY1_REFRESHED:+, refreshed for $KV: $SKY1_REFRESHED/ in this repo}
 dts/scripts: jbuck2005/orangepi6 $(git -C "$REPO" rev-parse --short HEAD)
 compiler: $(${CC%% *} --version | head -1)
 built: $(date -Is) on $(uname -r)
@@ -39,7 +41,7 @@ echo "== patched source"
 P=$OUT/src; mkdir -p "$P"
 tar -C "$P" -xf "$WORK/linux-$KV.tar.xz"
 ( cd "$P/linux-$KV"
-  for p in "$WORK"/linux-sky1/patches/*.patch; do git apply --whitespace=nowarn "$p"; done
+  apply_sky1_patches "$WORK/linux-sky1" "$OUT/patch.log" >/dev/null
   cp "$REPO/dts/sky1-orangepi-6.dts" arch/arm64/boot/dts/cix/
   grep -q sky1-orangepi-6.dtb arch/arm64/boot/dts/cix/Makefile || echo 'dtb-$(CONFIG_ARCH_CIX) += sky1-orangepi-6.dtb' >> arch/arm64/boot/dts/cix/Makefile
   cp "$SRC/.config" .config )

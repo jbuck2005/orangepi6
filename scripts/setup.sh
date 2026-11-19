@@ -6,7 +6,7 @@
 # Steps (each one is checked; the script stops with a clear message on the first failure):
 #   1. preflight   board, firmware, OS, disk space, network
 #   2. packages    build dependencies and Mesa/Vulkan userspace from the Ubuntu archive (apt)
-#   3. source      kernel.org 6.18.14 (signature checked) + Sky1-Linux patches + this repo's DTS
+#   3. source      kernel.org $KV from kernel.conf (signature checked) + Sky1-Linux patches + this repo's DTS
 #   4. build       Image, modules, DTBs (-j6, 20-60 min)
 #   5. stage       /boot/sky1/*, modules, initramfs, NIC MAC pins; then install.sh verify
 #   6. default     "Sky1 (acpi)" becomes the GRUB default; Armbian stays entry 0 and the
@@ -21,8 +21,9 @@ set -euo pipefail
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 WORK=${WORK:-$HOME/sky1-build}
 export WORK
-KV=6.18.14
-RELEASE_TAG=${RELEASE_TAG:-v2026.11.19}
+# shellcheck disable=SC1091
+. "$REPO/kernel.conf"
+RELEASE_TAG=${RELEASE_TAG:-v2026.11.19.1}
 RELEASE_URL=${RELEASE_URL:-https://github.com/jbuck2005/orangepi6/releases/download/$RELEASE_TAG}
 STEPS="preflight packages source build stage default"
 if [ "${1:-}" = --prebuilt ]; then PREBUILT=1; shift; set -- "${1:-all}"; fi
@@ -69,7 +70,7 @@ packages() {
   say "packages (apt)"
   sudo apt-get update -q
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q \
-    build-essential flex bison bc cpio kmod xz-utils zstd libssl-dev libelf-dev \
+    build-essential flex bison bc cpio kmod xz-utils zstd libssl-dev libelf-dev patch \
     git curl gnupg ca-certificates device-tree-compiler dosfstools \
     mesa-vulkan-drivers mesa-utils vulkan-tools
   ls /lib/firmware/arm/mali/arch12.8/mali_csffw.bin >/dev/null || die "Mali CSF firmware missing (linux-firmware)"
@@ -104,7 +105,7 @@ build() {
   say "build (-j${JOBS:-6}, 20-60 min)"
   "$REPO/scripts/03-build.sh" > "$WORK/build.log.tail" 2>&1 || { tail -30 "$WORK/build.log"; die "build failed (see $WORK/build.log)"; }
   [ -f "$WORK/linux-$KV/arch/arm64/boot/Image" ] || die "no Image after build"
-  ok "kernel built"
+  ok "kernel built (03-build.sh synced it to disk)"
 }
 
 stage() {
@@ -113,6 +114,7 @@ stage() {
   [ "$(uname -r)" != "$KV-sky1" ] || die "running $KV-sky1: boot Armbian's kernel for this step
          (sudo grub-reboot \"\$(grep -m1 -oP \"menuentry '\\KArmbian[^']*\" /boot/grub/grub.cfg)\" && sudo reboot)"
   sudo WORK="$WORK" bash "$REPO/scripts/install.sh" stage
+  sync
 }
 
 default_() {
@@ -137,6 +139,12 @@ check() {
   local egl; egl=$(eglinfo -B -p surfaceless 2>/dev/null || true); grep -q 'Panfrost' <<<"$egl" || die "EGL/GLES does not use Panfrost"
   ok "GLES: Panfrost"
   [ -n "$(ip -4 route show default)" ] || warn "no default route (see INSTALL.md: NIC link training quirk)"
+  # only now is the new kernel known good: drop module trees of older sky1 releases
+  if [ "$(sudo grub-editenv list | sed -n 's/^sky1_pending=//p')" = 0 ]; then
+    sudo bash "$REPO/scripts/install.sh" prune
+  else
+    warn "keeping older sky1 modules until the boot is confirmed (re-run check later)"
+  fi
   echo; echo "All good. Benchmarks: $REPO/scripts/gpu-test.sh"
 }
 

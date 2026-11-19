@@ -37,6 +37,10 @@ In setup (**Esc**): CIX System Manager → Soc Configuration → **Memory Config
 
 Save with **F10**, then **Y**.
 
+**No RTC battery?** The board ships without one. Then every power loss resets these settings: memory speed goes back to
+`Auto` (6000) and "power on after power loss" goes back to off. Fit a CR2032 holder on the 2-pin 1.0 mm **JRTC1**
+connector to keep them.
+
 ## 3. Install Armbian
 Install the generic **Armbian UEFI arm64** image (we used Armbian 26.8.3 "resolute", Ubuntu 26.04 userspace)
 onto the NVMe the usual way, boot it, and get on the network.
@@ -49,7 +53,7 @@ cd orangepi6
 scripts/setup.sh
 ```
 `setup.sh` checks the board and firmware, installs the build tools and Mesa from the Ubuntu archive, fetches Linux
-6.18.14 from kernel.org (and checks Greg Kroah-Hartman's signature), applies the Sky1-Linux patches and this repo's
+6.18.64 (the version in `kernel.conf`) from kernel.org (and checks Greg Kroah-Hartman's signature), applies the Sky1-Linux patches and this repo's
 non-Plus device tree, and builds the kernel (`-j6`, 20 minutes to an hour). It then installs the kernel into `/boot/sky1/`
 and makes it the GRUB default. Every step is checked, and the script stops with a clear message on the first failure.
 Re-running it skips steps that are already done.
