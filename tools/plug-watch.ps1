@@ -5,10 +5,15 @@
 # switched off in its web UI) or a plug running Tasmota. The off/on sequence runs ON THE PLUG
 # (Shelly toggle_after / Tasmota Backlog Delay), so power comes back even if this PC goes away mid-cycle.
 #
-# Config (kept outside the repo, so no LAN addresses or passwords get committed): a JSON file, default
-# aipi-plug.json next to serial.log:
+# Home Assistant: any plug HA can switch (e.g. an Emporia plug). Create an HA script that does
+# off -> delay 30 s -> on (see INSTALL.md), so the off/on runs inside HA and power always comes back.
+#
+# Config (kept outside the repo, so no LAN addresses, tokens or passwords get committed): a JSON file,
+# default aipi-plug.json next to serial.log:
+#   { "type": "homeassistant", "url": "http://<ha address>:8123", "token": "<long-lived token>",
+#     "script": "script.aipi_power_cycle" }
 #   { "type": "shelly", "host": "<plug address>", "user": "", "password": "", "offSeconds": 30 }
-#   "type": "tasmota" works the same way.
+#   "type": "tasmota" works like shelly.
 #
 #   pwsh -File plug-watch.ps1 -Once                 # one power cycle now
 #   pwsh -File plug-watch.ps1 [-Log <serial.log>]   # watch the serial log and cycle on link-training failure
@@ -36,9 +41,16 @@ function Invoke-PowerCycle {
       $auth = if ($cfg.user) { "&user=$([uri]::EscapeDataString($cfg.user))&password=$([uri]::EscapeDataString($cfg.password))" } else { '' }
       Invoke-RestMethod -Uri "http://$($cfg.host)/cm?cmnd=$cmd$auth" -TimeoutSec 10 | Out-Null
     }
+    'homeassistant' {
+      # Runs the HA script (off, wait, on). Returns as soon as HA has started it.
+      $h = @{ Authorization = "Bearer $($cfg.token)" }
+      $body = @{ entity_id = $cfg.script } | ConvertTo-Json
+      Invoke-RestMethod -Method Post -Uri "$($cfg.url.TrimEnd('/'))/api/services/script/turn_on" `
+        -Headers $h -ContentType 'application/json' -Body $body -TimeoutSec 15 | Out-Null
+    }
     default { throw "unknown plug type '$($cfg.type)'" }
   }
-  "=== $(Get-Date -Format s) plug-watch: power-cycled aiPi ($off s off)" | Add-Content -Path $Log -Encoding utf8
+  "=== $(Get-Date -Format s) plug-watch: power cycle started ($($cfg.type))" | Add-Content -Path $Log -Encoding utf8
 }
 
 if ($Once) { Invoke-PowerCycle; return }
