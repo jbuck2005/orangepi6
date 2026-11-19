@@ -1,5 +1,5 @@
 #!/bin/bash
-# Fetch kernel.org $KV (kernel.conf), verify Greg K-H's signature, apply Sky1-Linux LTS patches,
+# Fetch kernel.org $KV (kernel.conf), verify Greg K-H's signature, apply the Sky1 patches for this track,
 # add the Orange Pi 6 (non-Plus) device tree, and configure.
 set -euo pipefail
 REPO=$(cd "$(dirname "$0")/.." && pwd)
@@ -29,6 +29,9 @@ cp "../linux-sky1/config/$SKY1_CONFIG" .config
   --enable DEBUG_INFO_NONE --disable DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT --disable DEBUG_INFO_DWARF5 \
   --enable PSTORE_RAM --enable PSTORE_CONSOLE --enable PSTORE_PMSG \
   --enable NETCONSOLE --enable NETCONSOLE_DYNAMIC --enable NETPOLL --enable CONFIGFS_FS --enable R8125
+# per-track config changes from kernel.conf (word splitting intended)
+# shellcheck disable=SC2086
+[ -z "${KCONFIG_EXTRA:-}" ] || ./scripts/config $KCONFIG_EXTRA
 make HOSTCC="$HOSTCC" CC="$CC" olddefconfig >/dev/null
 KREL=$(make -s kernelrelease)
 [ "$KREL" = "$KV-sky1" ] || { echo "unexpected kernel release $KREL (is $WORK inside a git repo?)"; exit 1; }

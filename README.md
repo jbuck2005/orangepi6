@@ -8,6 +8,8 @@ on Armbian userspace.
 - GPU: mainline **panthor**, with Mesa from Ubuntu 26.04: **panvk** (Vulkan 1.4) and **Panfrost** (GLES 3.1).
 - No CIX vendor kernel and no closed Mali (`mali_kbase` / `libmali`) stack.
 - Armbian's own kernel stays installed as entry 0 in GRUB and as an automatic fallback.
+- Experimental: a **kernel 7.3.5** track with our own forward port of the Sky1 patches, compile-checked only so far.
+  See [docs/KERNEL-7.md](docs/KERNEL-7.md).
 
 **To install, see [INSTALL.md](INSTALL.md).** In short: update the board firmware if it's V0.8, install Armbian,
 then run `scripts/setup.sh`.
