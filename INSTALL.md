@@ -87,7 +87,9 @@ scripts/gpu-test.sh           # optional: vulkaninfo, glmark2, vkmark
   access token and use `{"type":"homeassistant","url":"http://<ha>:8123","entity":"switch.<plug>","token_file":"<file>"}`
   (the file holds just the token, chmod 600; or add `"token_var":"HA_TOKEN"` to read one variable from an env file):
   the watcher calls `switch.turn_off`, waits 30 s, then `switch.turn_on`, retrying for up to 10 minutes and
-  logging loudly if the plug doesn't come back on. (`scripts/nic-power.sh`, which switches the NIC rails
+  logging loudly if the plug doesn't come back on. **Fit an RTC battery first** (CR2032 on the `JRTC1` lead):
+  without one, every power cut resets the firmware settings, so memory drops back to its default speed and the
+  "power on after AC loss" setting turns off, and the board then stays off after the plug comes back on. (`scripts/nic-power.sh`, which switches the NIC rails
   through GPIO038/039, is experimental: it froze the board under Armbian.)
 - **LLMs on the GPU:** llama.cpp's Vulkan backend on panvk generates text at only ~1.7 tok/s, and prompt processing
   fails with `ErrorOutOfDeviceMemory`. Use the CPU for now: Qwen2.5-1.5B Q4 runs at ~124 tok/s for prompts and ~37 tok/s

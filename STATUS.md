@@ -30,7 +30,9 @@
   Empty ports read 40080 = Detect.Quiet. A 30 s power-off fixes it. The NIC rails are switched by GPIO038/039
   (S5 GPIO0 lines 27/28, schematic p19-20; firmware drives them as outputs, high). Switching them from
   Armbian through /dev/mem froze the board twice, so `scripts/nic-power.sh` is experimental and gated.
-  Supported workaround: a local smart plug driven by `tools/plug-watch.ps1` from the serial log.
+  Supported workaround: a local smart plug driven by `tools/plug-watch.ps1` from the serial log (tested: one
+  cycle through Home Assistant from Zeus, 2026-11-19). Needs an RTC battery (CR2032 on JRTC1): without one a
+  power cut resets the firmware settings (6400 -> 6000 MT/s, power-on-after-AC-loss off) and the board stays off.
 
 ## Phase 2: NPU (next)
 - Leads: [visorcraft/orange-pi-6-plus-npu](https://github.com/visorcraft/orange-pi-6-plus-npu), [Sky1-Linux/sky1-drivers-dkms](https://github.com/Sky1-Linux/sky1-drivers-dkms).

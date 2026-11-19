@@ -1,6 +1,9 @@
 # Power-cycles aiPi through a local smart plug, by hand or automatically when the firmware fails
 # NIC link training ("Root Port 2/3: Link Up Fail" on the debug UART, logged by bench/serial-log.ps1).
 #
+# Needs an RTC battery on the board (CR2032 on JRTC1): without it a power cut resets the firmware settings
+# and "power on after AC loss" is off, so the board stays off after the cycle.
+#
 # Plug: any plug with a local HTTP API and no cloud account, e.g. a Shelly Gen2+/Gen3 plug (cloud can be
 # switched off in its web UI) or a plug running Tasmota. The off/on sequence runs ON THE PLUG
 # (Shelly toggle_after / Tasmota Backlog Delay), so power comes back even if this PC goes away mid-cycle.
