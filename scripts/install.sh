@@ -158,7 +158,13 @@ verify() {
 stage() {
   need_root; load_build
   echo "== stage $KREL"
-  make -C "$SRC" HOSTCC="$HOSTCC" CC="$CC" -s modules_install
+  if [ -d "$SRC/modinst/lib/modules/$KREL" ]; then
+    # prebuilt release (setup.sh --prebuilt): modules come ready-installed in modinst/
+    rm -rf "/lib/modules/$KREL"
+    cp -a "$SRC/modinst/lib/modules/$KREL" "/lib/modules/$KREL"
+  else
+    make -C "$SRC" HOSTCC="$HOSTCC" CC="$CC" -s modules_install
+  fi
   depmod "$KREL"
   install -d "$BOOTDIR"
   install -m644 "$SRC/arch/arm64/boot/Image" "$BOOTDIR/vmlinuz"
