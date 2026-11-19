@@ -45,3 +45,15 @@
   it boots Armbian and sets `sky1_failed=1`, so Armbian stays the default until `default` is run
   again. One-shot test boots (`arm`) are unaffected. Both paths were tested on the board.
 - `stage` must run from Armbian (it reads the real NIC MACs from r8169); `verify`/`arm` work from either.
+
+## Memory stability and benchmarks (2026-11-18)
+- The shipped firmware (OPI6BiosV0.8, 2026-04-27) was unstable at its default 6400 MT/s: 1227 corrected
+  + 1 uncorrectable DDR ECC errors in 3 min of stress on stock Armbian, plus board resets under load.
+- The official 2026-10-19 firmware (`bios_v1.0.bin`, flashed with FlashUpdate.efi from the UEFI Shell)
+  fixes it: 0 ECC errors at 5500, 6000 (its new Auto) and 6400, including a 4-hour combined
+  CPU+RAM+GPU soak at 6400. Details and the table: `bench/MEMORY-AB-REPORT.md`.
+- Benchmarks are the same at every rate: llama.cpp CPU Qwen2.5-1.5B Q4 124/36.6 tok/s (pp/tg),
+  7B 33.7/8.75; vkpeak fp32 1.2 TF, fp16 2.1 TF, int8 4.86 TOPS. llama.cpp on panvk: tg ~1.7 tok/s,
+  pp fails (ErrorOutOfDeviceMemory at CommandBuffer::end), so use the CPU for LLMs for now.
+- Use `-dev none` for CPU-only llama-bench in a Vulkan build (otherwise it still offloads to the GPU).
+- Scripts: `bench/` (suite, soak, bandwidth, build, UART logger for Windows).
