@@ -114,7 +114,7 @@ Orion O6 / Sky1 XCP boards.
 
 ## Board results
 
-- 2026-11-19, first boot (commit 894bd12): native build on the board (gcc 15.2) had 0 errors.
+- 2026-11-19, first boot (commit 193c5c5): native build on the board (gcc 15.2) had 0 errors.
   The boot reached `Linux version 7.3.5-sky1` and then died. The NVMe root port's AER interrupt
   fired about 90 times a second right after PCIe link training, with no error latched anywhere
   (root error status 0, DEVSTA error bits 0). Each interrupt logged two lines to the serial
@@ -125,7 +125,7 @@ Orion O6 / Sky1 XCP boards.
   that line is disabled. The AER logging is rate-limited and printed after the lock is dropped,
   and probe logs the local/AER IRQ numbers so the next boot log shows which line it is.
 
-- 2026-11-19, retest with `0045` (commit d454c6c): native build with 45 patches, 0 fuzz. Boots,
+- 2026-11-19, retest with `0045` (commit e736ada): native build with 45 patches, 0 fuzz. Boots,
   `setup.sh check` passes (7.3.5-sky1, panthor with render node, panvk Mali-G720 MC10, Panfrost).
   All three PCIe links up with no spurious AER lines, so the storm is gone. NVMe and both r8125
   are fine, ACE-Lite coherency is on. cpufreq is cppc_cpufreq on 5 policies and cpuidle is
