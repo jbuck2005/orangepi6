@@ -88,32 +88,50 @@ gpio_chip() {  # gpiochip whose parent device owns the S5 GPIO0 MMIO block
   done
   return 1
 }
+# A block listed in /proc/iomem may only be an ACPI resource reservation (Armbian): it counts as
+# driver-owned only if a driver is actually bound to the ACPI device's physical node.
+driver_bound() {  # driver_bound ADDR
+  local owner; owner=$(iomem_owner "$1")
+  [ -n "$owner" ] || return 1
+  ls -d /sys/bus/acpi/devices/"$owner"/physical_node*/driver >/dev/null 2>&1
+}
+# How we can drive the S5 GPIO: "gpiod CHIP", "mem", or "none REASON". Decided before touching anything.
+gpio_mode() {
+  local chip
+  if chip=$(gpio_chip); then
+    command -v gpioset >/dev/null && command -v gpioget >/dev/null && { echo "gpiod $chip"; return; }
+    echo "none S5 GPIO has a kernel driver ($chip); install gpiod (apt install gpiod)"; return
+  fi
+  if driver_bound 16004000; then echo "none S5 GPIO driver bound but no gpiochip for it"; return; fi
+  if mem read "$(reg 0x10)" >/dev/null 2>&1; then echo mem; else echo "none /dev/mem not readable"; fi
+}
 gpiod_v2() { gpioset --version 2>/dev/null | grep -q 'v2'; }
 
 power() {  # power off SECS (cut, wait, restore) | power on
-  local M chip l args=() inargs=()
-  M=$(mask)
-  if chip=$(gpio_chip); then
-    command -v gpioset >/dev/null || die "S5 GPIO is driver-owned ($chip); install gpiod (apt install gpiod)"
-    for l in $LINES; do args+=("$l=0"); inargs+=("$l"); done
-    if [ "$1" = off ]; then
-      if gpiod_v2; then timeout "$2" gpioset -c "$chip" "${args[@]}" || true; else gpioset --mode=time --sec="$2" "$chip" "${args[@]}"; fi
-    fi
-    # Reading the lines requests them as inputs: the pull-ups switch the rails back on.
-    if gpiod_v2; then gpioget -c "$chip" "${inargs[@]}" >/dev/null; else gpioget "$chip" "${inargs[@]}" >/dev/null; fi
-    return
-  fi
-  [ -z "$(iomem_owner 16004000)" ] || die "S5 GPIO is owned by a driver but no gpiochip found for it"
-  if [ "$1" = off ]; then
-    [ -z "$(iomem_owner 16007000)" ] && { pads_to_gpio || return 1; }
-    mem rmw "$(reg 0x00)" "$M" 0  >/dev/null &&   # GPIO mode (clear bypass)
-    mem rmw "$(reg 0x0c)" "$M" 0  >/dev/null &&   # output value 0
-    mem rmw "$(reg 0x08)" 0 "$M"  >/dev/null &&   # output enable
-    mem rmw "$(reg 0x04)" "$M" 0  >/dev/null ||   # direction = output -> pads low -> rails off
-      { mem rmw "$(reg 0x04)" 0 "$M" >/dev/null; return 1; }
-    sleep "$2"
-  fi
-  mem rmw "$(reg 0x04)" 0 "$M"  >/dev/null        # direction = input -> pull-ups -> rails on
+  local M mode chip l args=() inargs=()
+  M=$(mask); mode=$(gpio_mode)
+  case "$mode" in
+    gpiod*)
+      chip=${mode#gpiod }
+      for l in $LINES; do args+=("$l=0"); inargs+=("$l"); done
+      if [ "$1" = off ]; then
+        if gpiod_v2; then timeout "$2" gpioset -c "$chip" "${args[@]}" || true; else gpioset --mode=time --sec="$2" "$chip" "${args[@]}"; fi
+      fi
+      # Reading the lines requests them as inputs: the pull-ups switch the rails back on.
+      if gpiod_v2; then gpioget -c "$chip" "${inargs[@]}" >/dev/null; else gpioget "$chip" "${inargs[@]}" >/dev/null; fi ;;
+    mem)
+      if [ "$1" = off ]; then
+        driver_bound 16007000 || { pads_to_gpio || return 1; }
+        mem rmw "$(reg 0x00)" "$M" 0  >/dev/null &&   # GPIO mode (clear bypass)
+        mem rmw "$(reg 0x0c)" "$M" 0  >/dev/null &&   # output value 0
+        mem rmw "$(reg 0x08)" 0 "$M"  >/dev/null &&   # output enable
+        mem rmw "$(reg 0x04)" "$M" 0  >/dev/null ||   # direction = output -> pads low -> rails off
+          { mem rmw "$(reg 0x04)" 0 "$M" >/dev/null; return 1; }
+        sleep "$2"
+      fi
+      mem rmw "$(reg 0x04)" 0 "$M" >/dev/null ;;      # direction = input -> pull-ups -> rails on
+    *) log "cannot drive GPIO038/039: ${mode#none }"; return 1 ;;
+  esac
 }
 
 detach_nics() {  # unbind and remove the NIC PCI functions so nothing touches them while unpowered
@@ -160,7 +178,10 @@ arm_fallback() {
 # bus on this SoC, so every caller reboots afterwards and lets the firmware train fresh NICs.
 cycle() {
   local secs=${1:-$OFF_SECS} rps rp
+  local mode; mode=$(gpio_mode)
+  case "$mode" in gpiod*|mem) ;; *) note "not touching the NICs: ${mode#none }"; return 2 ;; esac
   rps=$(nic_rootports)
+  note "GPIO path: $mode"
   note "power-cycling NICs (${secs}s off); NICs present: $(nic_count); root ports: $(for rp in $rps; do printf '%s=%s ' "$rp" "$(link_state "$rp")"; done)"
   detach_nics
   note "NIC PCI functions removed"
@@ -183,7 +204,7 @@ probe() {
   echo "== kernel $(uname -r)"
   echo "== /proc/iomem owners near S5 GPIO / iomux"; grep -iE '^ *1600[47]' /proc/iomem || echo "  (none: no kernel driver owns them)"
   local chip; chip=$(gpio_chip)
-  if [ -n "$(iomem_owner 16004000)" ]; then
+  if driver_bound 16004000; then
     # Driver-owned (sky1): no /dev/mem access at all; ask libgpiod instead.
     echo "== S5 GPIO0 lines $LINES via ${chip:-?} (driver-owned, registers not read)"
     command -v gpioinfo >/dev/null && { gpioinfo -c "$chip" 2>/dev/null || gpioinfo "$chip"; } 2>/dev/null | grep -E 'line +2[78]:'
@@ -197,7 +218,8 @@ probe() {
     echo "== pad mux (function bits 8:7, 0 = GPIO)"
     for p in $PADS; do v=$(mem read "$(printf '0x%x' $(( PAD_BASE + p )))"); printf '  pad +%s = %s  func=%d\n' "$p" "$v" $(( (v >> 7) & 3 )); done
   fi
-  echo "== S5 GPIO0 owner: $(iomem_owner 16004000) -> chip: $(gpio_chip || echo 'none (registers via /dev/mem)')  gpioset: $(command -v gpioset || echo missing)"
+  echo "== S5 GPIO0 iomem: $(iomem_owner 16004000) (driver bound: $(driver_bound 16004000 && echo yes || echo no)); chip: ${chip:-none}; gpioset: $(command -v gpioset || echo missing)"
+  echo "== GPIO path that cycle would use: $(gpio_mode)"
   echo "== RTL8125 PCI functions ($(nic_count) of $EXPECT)"
   for b in $(nic_bdfs); do echo "  $b driver=$(basename "$(readlink -f /sys/bus/pci/devices/$b/driver 2>/dev/null)" 2>/dev/null) net=$(ls /sys/bus/pci/devices/$b/net 2>/dev/null | tr '\n' ' ')"; done
   echo "== default route via: $(ip -4 route show default 2>/dev/null | awk '{print $5}' | head -1)"
@@ -235,8 +257,11 @@ case "${1:-}" in
     # "Root Port 2/3: Link Up Success" and this log after the reboot.
     OUT=/var/log/opi6-nic-selftest.txt
     { echo "== $(date -Is) selftest on $(uname -r)"; probe; } > "$OUT" 2>&1; sync
+    # Preflight before arming anything: if the GPIO path isn't usable, nothing is touched and no reboot.
+    m=$(gpio_mode); case "$m" in gpiod*|mem) ;; *) note "selftest aborted, nothing touched: ${m#none }"; exit 1 ;; esac
     arm_fallback 90
-    CHECK_OFF=1 cycle "$OFF_SECS" || note "cycle failed"
+    CHECK_OFF=1 cycle "$OFF_SECS"; rc=$?
+    [ $rc = 0 ] || note "cycle failed (rc=$rc)"
     note "rebooting now (fallback timer forces it if this hangs)"
     systemctl reboot ;;
   shutdown-hook)
