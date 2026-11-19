@@ -215,6 +215,9 @@ cmdline() {  # $1 = mode (dt|acpi), $2 = root uuid
     . "$NETCON_CONF"
     nc=" netpoll.carrier_timeout=15 netconsole=+6665@$LOCAL_IP/$LOCAL_MAC,6666@$REMOTE_IP/$REMOTE_MAC"
   fi
+  # EXTRA_CMDLINE: extra parameters for a one-shot debug boot (e.g. initcall_debug). Not used
+  # by the default entry.
+  if [ -n "${EXTRA_CMDLINE:-}" ] && [ "${DEFAULT:-0}" != 1 ]; then c="$c $EXTRA_CMDLINE"; fi
   case "$mode" in
     dt)   [ -n "$early" ] || c="$c earlycon"; c="$c acpi=off console=ttyAMA2,115200" ;;
     acpi) c="$c acpi=force arm-smmu-v3.disable_bypass=0" ;;

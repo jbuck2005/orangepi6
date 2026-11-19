@@ -156,7 +156,35 @@ Orion O6 / Sky1 XCP boards.
 - Also seen, not changed: when the old handler re-enables root error reporting it writes to the
   PCIe capability offset instead of the AER offset, so after the first handled AER interrupt the
   root port's error reporting stays off.
+- Warm reboot from 7.3.5 hangs after systemd-reboot finishes. The last lines are "watchdog0:
+  watchdog did not stop!" (twice), and the firmware never resets; 6.18.x reboots fine. Our boot
+  entries pass `efi=noruntime`, so the reset goes through PSCI SYSTEM_RESET (restart handler
+  priority 129, ahead of the Sky1 watchdog's 128). That PSCI code is the same in 6.18.14 and 7.3.5.
+  So either a driver shutdown or syscore callback hangs before the reset, or the firmware's reset
+  fails because of the state 7.x left behind. `0050` is a debug patch that logs each step
+  ("reboot: calling restart handlers", "reboot: PSCI system reset ..."). `install.sh arm` now takes
+  `EXTRA_CMDLINE` for a one-shot boot, so `initcall_debug` can print one line per device shutdown
+  and per syscore callback. Test plan below.
 - Not done yet: an hour of load and stability testing on 7.3.5.
+
+### Warm reboot test plan
+
+Every hang needs a ~30 s power-off. Watch the serial log from Prometheus.
+
+1. Build natively and stage, then do a one-shot boot with
+   `sudo SERIAL=1 EXTRA_CMDLINE=initcall_debug ./scripts/install.sh arm acpi`.
+2. Test A: `sudo systemctl reboot`. Note the last lines on the serial log:
+   - the last "shutdown" device line or "PM: Calling ..." syscore line means that callback hangs;
+   - "reboot: Restarting system" but no "reboot: calling restart handlers" means the hang is in
+     the gap between them (CPU stop);
+   - "reboot: PSCI system reset" as the last line means the firmware reset itself hangs.
+3. Test B, only if A hung: boot the same entry again and run
+   `echo 1 | sudo tee /proc/sys/kernel/sysrq; sync; echo b | sudo tee /proc/sysrq-trigger`.
+   This skips every device shutdown and syscore callback. If B resets but A did not, a shutdown
+   callback leaves the board in a state where it can't reset, and A's log names it.
+4. Test C, only if B also hung at the PSCI line: boot with
+   `EXTRA_CMDLINE="initcall_debug modprobe.blacklist=scmi_cpufreq cpufreq.off=1"` and repeat A.
+   CPPC requests go to the same SCP that handles the reset, so this rules out a stuck SCP mailbox.
 
 ## Testing on the board
 
