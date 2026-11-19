@@ -138,6 +138,12 @@ check() {
   local egl; egl=$(eglinfo -B -p surfaceless 2>/dev/null || true); grep -q 'Panfrost' <<<"$egl" || die "EGL/GLES does not use Panfrost"
   ok "GLES: Panfrost"
   [ -n "$(ip -4 route show default)" ] || warn "no default route (see INSTALL.md: NIC link training quirk)"
+  # only now is the new kernel known good: drop module trees of older sky1 releases
+  if [ "$(sudo grub-editenv list | sed -n 's/^sky1_pending=//p')" = 0 ]; then
+    sudo bash "$REPO/scripts/install.sh" prune
+  else
+    warn "keeping older sky1 modules until the boot is confirmed (re-run check later)"
+  fi
   echo; echo "All good. Benchmarks: $REPO/scripts/gpu-test.sh"
 }
 
