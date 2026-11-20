@@ -220,6 +220,15 @@ Orion O6 / Sky1 XCP boards.
   12. `cpu-diag.sh` now adds an EAS-off variant and logs the sched domains and every cache
   level, to compare with a 6.18 run.
 
+- 2026-11-20 12:32Z: the board hung while building on Armbian's own 6.18.45 kernel at 6000 MT/s,
+  with the same signature as the 7.3.5 hang at 6400 (draw drops from ~36 W to a steady 23 W,
+  off the network, serial silent, no ECC lines). So sustained heavy load can hang this board
+  on more than one kernel and at 6000 too. The 6400 ECC errors are real, but they may not be
+  the whole cause of the hangs, and the 7.3.5 failure at 6400 is no longer evidence against or
+  for kernel 7 on its own. Open causes: power delivery under load, memory margin at 6000 as
+  well, or something tied to compile load (NVMe/PCIe traffic). The 4 h clean soak on 6.18.14
+  was stress-ng plus vkmark, without a compile.
+
 ### Warm reboot test plan
 
 Every hang needs a ~30 s power-off. Watch the serial log from Prometheus.
