@@ -202,6 +202,15 @@ Orion O6 / Sky1 XCP boards.
   by something outside the standard error registers. `0052` switches the line back on 2 s
   after a burst (up to 5 times), so non-fatal error reporting isn't lost for the whole boot.
 
+- 2026-11-20, 1 h load at 6000 MT/s (commit 5306e16) PASSED: kernel build -j6 in 21 min,
+  stress-ng vm+cpu with --verify 0 failures, no DDRC or ECC lines on serial, EDAC 0/0. Peak
+  70 C (CPU_B0 65, DDR_top 64, DDR_btm 57). This fits the 6400 failure being a memory-margin
+  problem, not the kernel; 6000 (the firmware's Auto) is the setting to use with this track.
+- Reboot test A PASSED on the same boot: "reboot: Restarting system", "calling restart
+  handlers", "PSCI system reset (mode 0, reset2 1)", then the firmware banner. The earlier hang
+  was at 6400, so it may share the memory cause, or be the board's known flaky warm reset.
+  Watch for it again; tests B and C are not needed for now.
+
 ### Warm reboot test plan
 
 Every hang needs a ~30 s power-off. Watch the serial log from Prometheus.
