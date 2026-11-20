@@ -215,6 +215,15 @@ Branch `claude/project-thread-cxukj3`, **experimental**, built from source only 
 **Finding:** wall power (including the power supply), from the plug's once-a-minute readings: off ~1 W, idle ~17 W,
 kernel build ~35 W, kernel 7 load test 30-36 W, hung after an ECC error ~23 W.
 
+## 2026-11-20: README brought up to date
+
+- README rewritten as the project's landing page: a quick-start install path (firmware, Armbian, `setup.sh
+  --prebuilt`), firmware and BIOS (`opi6_bios_image_20261019`, the Memory Data Rate path, 6000 and 6400 tested on
+  6.18.64, Save & Exit), the missing RTC battery (JRTC1 2-pin 1.0 mm, no holder, non-charging: CR2032 on an SH1.0
+  lead), hardware notes (r8125, the NVMe AER storm fix, power draw), results, known issues (NIC loss after a warm
+  reboot, kernel 7 experimental), the debug serial console, and the roadmap (NPU next).
+- INSTALL.md: the RTC battery note matches (no holder, non-charging, SH1.0 lead), and settings are saved with Save & Exit.
+
 ## Open items
 
 - NPU (phase 2): the in-tree `armchina` driver already probes on the sky1 ACPI boot. Leads:
