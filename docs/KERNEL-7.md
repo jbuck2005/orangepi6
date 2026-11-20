@@ -167,6 +167,27 @@ Orion O6 / Sky1 XCP boards.
   and per syscore callback. Test plan below.
 - Not done yet: an hour of load and stability testing on 7.3.5.
 
+- 2026-11-19, load test at 6400 MT/s (commit c83e43f) FAILED. The firmware reported DDRC ECC
+  errors on serial: about 6 min into a -j6 build, single- then double-bit write errors on
+  channel 3, and later during stress-ng, read errors on channel 0 ("Link ECC Error on Byte1
+  Beat 1 Dq2"), then "DFI detected", and the board hung. 6.18.64 ran 1 h of the same load at
+  6400 clean, and 6.18.14 passed a 4 h soak at 6400.
+  - What differs in software: nothing that reaches the memory controller. In ACPI mode the
+    only Sky1 drivers that touch DDR (`cix-ddr-lp`, DDR low-power control over a TF-A SMC, and
+    `cix-bus-perf`, interconnect DVFS) match only DT compatibles, so they do not bind, and they
+    are the same code in the LTS set. No patch touches a DDRC, DMC devfreq or DDR SCMI perf
+    domain. The base configs differ only in filesystems, netfilter, crypto and similar; the new
+    7.x defaults add SoC and erratum options for other vendors, plus `SCHED_CACHE`. Nothing
+    there controls memory timing, refresh or voltage, which the firmware sets at boot.
+  - The errors are DQ link ECC errors, which point to signal margin at 6400 (the shipped
+    firmware threw the same kind at 6400). A kernel can only move that margin indirectly,
+    through temperature and supply load: how hard and how long the cores and memory run. One
+    clean run against one failed run doesn't separate a kernel effect from a marginal part.
+  - Next step: `bench/thermal-log.sh` logs every thermal zone and hwmon sensor (now including
+    DDR_top/DDR_btm on 7.3.5), CPU clocks and EDAC counts every 5 s. Run it during the same
+    load on both kernels and compare the DDR temperatures, or run 7.3.5 at 6000 (the firmware's
+    Auto setting) for an hour with it logging.
+
 ### Warm reboot test plan
 
 Every hang needs a ~30 s power-off. Watch the serial log from Prometheus.
