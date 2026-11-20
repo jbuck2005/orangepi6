@@ -35,11 +35,12 @@ In setup (**Esc**): CIX System Manager → Soc Configuration → **Memory Config
 - On the 2026-10-19 firmware, `Auto` (6000 MT/s) or `6400` are both fine. We measured no speed difference for CPU, GPU or LLM work.
 - If you're stuck on V0.8, set **5500 MT/s**. That was error-free on our board.
 
-Save with **F10**, then **Y**.
+Save & Exit with **F10**, then **Y**, and let the board boot.
 
 **No RTC battery?** The board ships without one. Then every power loss resets these settings: memory speed goes back to
-`Auto` (6000) and "power on after power loss" goes back to off. Fit a CR2032 holder on the 2-pin 1.0 mm **JRTC1**
-connector to keep them.
+`Auto` (6000) and "power on after power loss" goes back to off. The board has a 2-pin 1.0 mm **JRTC1** header with
+no holder, and it doesn't charge the cell: fit a plain **CR2032** with an SH1.0 (JST 1.0 mm) 2-pin lead, observing
+polarity. Until then, don't cut the power right after saving a setting.
 
 ## 3. Install Armbian
 Install the generic **Armbian UEFI arm64** image (we used Armbian 26.8.3 "resolute", Ubuntu 26.04 userspace)
