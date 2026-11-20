@@ -1,0 +1,127 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: orangepi6 kernel-7 port
+Subject: [PATCH] PCI sky1 ack the LTSSM transition indication on AER lines
+
+The 0051 dump on the board showed what holds aer_nf asserted: local err0
+bit 31, the LTSSM-transition indication, latched and not masked, with every
+AER register clear. Nothing on that line ever acked it, so the level
+interrupt fired forever. Ack it the way the local IRQ handler does (AXI
+slave indication bit, LTSSM status channels, then the latched bit) and
+treat the interrupt as handled. LTSSM-only interrupts still count towards
+the 0045 guard, which now counts only bursts (a gap of more than 1 s
+resets it), so a link that keeps changing state cannot hold the CPU.
+---
+ drivers/pci/controller/cadence/pci-sky1.c | 61 +++++++++++++++++++++++--------
+ drivers/pci/controller/cadence/pci-sky1.h |  1 +
+ 2 files changed, 47 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/pci/controller/cadence/pci-sky1.c b/drivers/pci/controller/cadence/pci-sky1.c
+index e253e36da..f69d2e853 100644
+--- a/drivers/pci/controller/cadence/pci-sky1.c
++++ b/drivers/pci/controller/cadence/pci-sky1.c
+@@ -728,17 +728,38 @@ static void sky1_pcie_handle_ep_aer_irq(struct sky1_pcie *pcie)
+ static u32 sky1_pcie_clear_local_aer(struct sky1_pcie *pcie, const char *when)
+ {
+ 	void __iomem *reg_base = pcie->reg_base + CDNS_PCIE_RP_BASE;
+-	u32 sta = readl(reg_base + I_LOCAL_ERR_STS_REG0) & SKY1_LOCAL_AER_BITS;
++	u32 raw = readl(reg_base + I_LOCAL_ERR_STS_REG0);
++	u32 sta = raw & SKY1_LOCAL_AER_BITS;
+ 	int i;
+ 
+-	if (!sta)
+-		return 0;
+-	writel(sta, reg_base + I_LOCAL_ERR_STS_REG0);
+-	for (i = 0; i < 32; i++)
+-		if (sta & BIT(i))
+-			dev_warn_ratelimited(pcie->dev, "%s: local err0 %s latched, cleared\n",
+-					     when, sky1_local_err_msg(PCIE_LOCAL_ERR0, i));
+-	return sta;
++	/*
++	 * Bit 31 is the LTSSM-transition indication (channels set up by
++	 * sky1_pcie_enable_indicatbit_int()). On the board it was latched, and
++	 * not masked, while aer_nf stormed: this line carries it, and nothing
++	 * acked it. Ack it the way the local IRQ handler does, but quietly:
++	 * release the AXI slave indication bit, clear the LTSSM status
++	 * channels, then the latched bit.
++	 */
++	if (raw & BIT(LOCAL_ERR_LTSSTTRAN)) {
++		u32 lt = sky1_pcie_ctrl_readl_reg(pcie, LTSSM_TRANS_DEBUG_CTRL_STATUS);
++		u32 axi = cdns_pcie_readl(pcie->cdns_pcie, AXI_SLAVE_CTRL);
++
++		cdns_pcie_writel(pcie->cdns_pcie, AXI_SLAVE_CTRL, axi & ~BIT(0));
++		sky1_pcie_ctrl_writel_reg(pcie, LTSSM_TRANS_DEBUG_CTRL_STATUS, lt | 0xff);
++		writel(BIT(LOCAL_ERR_LTSSTTRAN), reg_base + I_LOCAL_ERR_STS_REG0);
++		dev_info_ratelimited(pcie->dev,
++			"%s: LTSSM transition indication latched (ltssm status 0x%08x, axi ctrl 0x%08x), cleared\n",
++			when, lt, axi);
++	}
++
++	if (sta) {
++		writel(sta, reg_base + I_LOCAL_ERR_STS_REG0);
++		for (i = 0; i < 32; i++)
++			if (sta & BIT(i))
++				dev_warn_ratelimited(pcie->dev, "%s: local err0 %s latched, cleared\n",
++						     when, sky1_local_err_msg(PCIE_LOCAL_ERR0, i));
++	}
++	return sta | (raw & BIT(LOCAL_ERR_LTSSTTRAN));
+ }
+ 
+ static const char *sky1_pcie_aer_irq_name(struct sky1_pcie *pcie, int irq)
+@@ -864,21 +885,31 @@ static irqreturn_t sky1_pcie_aer_irq_handler(int irq, void *arg)
+ 	    !(devsta & (PCI_EXP_DEVSTA_CED | PCI_EXP_DEVSTA_NFED |
+ 			PCI_EXP_DEVSTA_FED))) {
+ 		unsigned int n;
++		u32 local;
+ 
+ 		/* A latched local (non-AER-capability) error is a source we can clear. */
+-		if (sky1_pcie_clear_local_aer(pcie, sky1_pcie_aer_irq_name(pcie, irq))) {
++		local = sky1_pcie_clear_local_aer(pcie, sky1_pcie_aer_irq_name(pcie, irq));
++		if (local & SKY1_LOCAL_AER_BITS) {
+ 			pcie->aer_spurious = 0;
+ 			spin_unlock_irqrestore(&pcie->aer_lock, flags);
+ 			return IRQ_HANDLED;
+ 		}
+ 
+-		/* Nothing latched: not ours, or a source we cannot clear. */
++		/*
++		 * Nothing latched (not ours, or a source we cannot clear), or only
++		 * the LTSSM indication: both count towards the guard below, so a
++		 * link that keeps changing state cannot hold the CPU either.
++		 */
++		if (time_after(jiffies, pcie->aer_last + HZ))
++			pcie->aer_spurious = 0;	/* only bursts count */
++		pcie->aer_last = jiffies;
+ 		n = ++pcie->aer_spurious;
+ 
+ 		spin_unlock_irqrestore(&pcie->aer_lock, flags);
+-		dev_warn_ratelimited(pcie->dev,
+-			"spurious AER irq %d (%s), no error status (%u in a row)\n",
+-			irq, sky1_pcie_aer_irq_name(pcie, irq), n);
++		if (!local)
++			dev_warn_ratelimited(pcie->dev,
++				"spurious AER irq %d (%s), no error status (%u in a row)\n",
++				irq, sky1_pcie_aer_irq_name(pcie, irq), n);
+ 		if (n == SKY1_AER_SPURIOUS_LIMIT) {
+ 			bool rearm;
+ 
+@@ -902,7 +933,7 @@ static irqreturn_t sky1_pcie_aer_irq_handler(int irq, void *arg)
+ 				schedule_delayed_work(&pcie->aer_rearm_work,
+ 					msecs_to_jiffies(SKY1_AER_REARM_DELAY_MS));
+ 		}
+-		return IRQ_NONE;
++		return local ? IRQ_HANDLED : IRQ_NONE;
+ 	}
+ 	pcie->aer_spurious = 0;
+ 
+diff --git a/drivers/pci/controller/cadence/pci-sky1.h b/drivers/pci/controller/cadence/pci-sky1.h
+index d3ce1cff9..72ea05ad1 100644
+--- a/drivers/pci/controller/cadence/pci-sky1.h
++++ b/drivers/pci/controller/cadence/pci-sky1.h
+@@ -154,6 +154,7 @@ struct sky1_pcie {
+ 	bool aer_uncor_dump;
+ 	/* consecutive AER interrupts that found no error status */
+ 	unsigned int aer_spurious;
++	unsigned long aer_last;		/* jiffies of the last one */
+ 	/* AER line switched off by the spurious-interrupt guard, re-enabled later */
+ 	int aer_off_irq;
+ 	unsigned int aer_rearms;

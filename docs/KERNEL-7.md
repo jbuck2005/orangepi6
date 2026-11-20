@@ -229,6 +229,21 @@ Orion O6 / Sky1 XCP boards.
   well, or something tied to compile load (NVMe/PCIe traffic). The 4 h clean soak on 6.18.14
   was stress-ng plus vkmark, without a compile.
 
+- 2026-11-20, f6a7895 boot: after each re-enable `aer_nf` burst again within 7-15 ms, five
+  times, then stayed off (384 interrupts). The `0051` dump found the source: local err0 bit 31,
+  the LTSSM-transition indication, latched and not masked (`sts 0x80000000`, mask
+  `0x0403ff00`), with every AER register clear. The driver only ever acked that bit from the
+  local IRQ handler, and here it arrives on aer_nf. `0053` acks it from the AER handler the same
+  way (AXI slave indication bit, LTSSM status channels, latched bit). The guard stays, but now
+  only counts bursts.
+- Silent hangs under build load: a repeat build on Armbian 6.18.45 at 6000 did not hang, but
+  the NVMe's sensor 1 peaked at 87 C and stayed at 80 C or more for about 13 minutes, while the
+  CPU sat at 43-45 C. A drive that throttles hard or drops off the bus at that temperature would
+  stall the root filesystem. The board would then look dead (no ssh) and fall to near-idle
+  power, which matches the 23 W hang signature. Check `sudo nvme smart-log /dev/nvme0` for
+  thermal throttle counts and time above the warning/critical temperature. On the next hang,
+  use SysRq over the serial console (`w`, then `t`) to see whether tasks are stuck on I/O.
+
 ### Warm reboot test plan
 
 Every hang needs a ~30 s power-off. Watch the serial log from Prometheus.
