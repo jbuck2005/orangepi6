@@ -5,6 +5,7 @@
 #   base        - as booted
 #   nollc       - 7.x cache-aware load balancing off (debugfs llc_balancing/enabled=0)
 #   perf        - cpufreq governor "performance" on every policy
+#   noeas       - energy-aware scheduling off (kernel.sched_energy_aware=0)
 #   pin-big     - threads pinned to the highest-capacity CPUs
 # Every setting is restored on exit. Needs sudo. Log: ~/bench/cpu-diag-<kernel>.log
 set -uo pipefail
@@ -20,7 +21,10 @@ sudo mount -t debugfs none /sys/kernel/debug 2>/dev/null || true
 declare -A GOV
 for p in /sys/devices/system/cpu/cpufreq/policy*; do GOV[$p]=$(cat "$p/scaling_governor"); done
 LLC_OLD=$(sudo cat "$LLC" 2>/dev/null || echo "")
+EAS=/proc/sys/kernel/sched_energy_aware
+EAS_OLD=$(cat "$EAS" 2>/dev/null || echo "")
 restore() {
+  [ -n "$EAS_OLD" ] && echo "$EAS_OLD" | sudo tee "$EAS" >/dev/null
   for p in "${!GOV[@]}"; do echo "${GOV[$p]}" | sudo tee "$p/scaling_governor" >/dev/null; done
   [ -n "$LLC_OLD" ] && echo "$LLC_OLD" | sudo tee "$LLC" >/dev/null
 }
@@ -45,10 +49,13 @@ for p in /sys/devices/system/cpu/cpufreq/policy*; do
        "min=$(cat $p/scaling_min_freq) max=$(cat $p/scaling_max_freq) hw_max=$(cat $p/cpuinfo_max_freq)" \
        "boost=$(cat $p/boost 2>/dev/null || cat /sys/devices/system/cpu/cpufreq/boost 2>/dev/null || echo n/a)"
 done
-echo "== sched domains (cpu0):"
-for d in /sys/kernel/debug/sched/domains/cpu0/domain*; do
-  sudo sh -c "echo \"${d##*/} \$(cat $d/name 2>/dev/null) flags=\$(cat $d/flags 2>/dev/null)\""
-done
+echo "== sched domains (cpu0, cpu2):"
+sudo sh -c 'for c in 0 2; do for d in /sys/kernel/debug/sched/domains/cpu$c/domain*; do
+  echo "cpu$c ${d##*/} $(cat $d/name 2>/dev/null) flags=$(cat $d/flags 2>/dev/null)"; done; done'
+echo "== cache levels (cpu0, cpu2):"
+for c in 0 2; do for i in /sys/devices/system/cpu/cpu$c/cache/index*; do
+  echo "cpu$c ${i##*/} L$(cat $i/level) $(cat $i/type) $(cat $i/size) shared=$(cat $i/shared_cpu_list)"
+done; done
 echo "== cpuidle states (cpu0):"
 for s in /sys/devices/system/cpu/cpu0/cpuidle/state*; do
   echo "${s##*/} $(cat $s/name) lat=$(cat $s/latency) disable=$(cat $s/disable)"
@@ -71,6 +78,9 @@ run() {
 run base
 if [ -n "$LLC_OLD" ]; then
   echo 0 | sudo tee "$LLC" >/dev/null; run nollc; echo "$LLC_OLD" | sudo tee "$LLC" >/dev/null
+fi
+if [ -n "$EAS_OLD" ]; then
+  echo 0 | sudo tee "$EAS" >/dev/null; run noeas; echo "$EAS_OLD" | sudo tee "$EAS" >/dev/null
 fi
 for p in "${!GOV[@]}"; do echo performance | sudo tee "$p/scaling_governor" >/dev/null; done
 run perf

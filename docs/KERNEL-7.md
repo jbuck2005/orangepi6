@@ -211,6 +211,15 @@ Orion O6 / Sky1 XCP boards.
   was at 6400, so it may share the memory cause, or be the board's known flaky warm reset.
   Watch for it again; tests B and C are not needed for now.
 
+- First `cpu-diag.sh` log on 7.3.5 (c83e43f at 6400): as booted pp512 109.3, tg128 30.1; LLC
+  balancing off and the performance governor change nothing (109.1/30.0, 110.2/30.5). Pinned
+  to the 8 big cores it gives pp512 121.4, tg128 35.0, close to 6.18.14 (123.8/36.6). So the
+  CPU slowdown is task placement: some of the 8 threads land on the four A520 cores (capacity
+  279). EAS is on (`sched_energy_aware` 1). The cache topology also looks uneven: the big
+  cores report a last-level cache shared by the 8 big cores, the little cores one shared by all
+  12. `cpu-diag.sh` now adds an EAS-off variant and logs the sched domains and every cache
+  level, to compare with a 6.18 run.
+
 ### Warm reboot test plan
 
 Every hang needs a ~30 s power-off. Watch the serial log from Prometheus.
