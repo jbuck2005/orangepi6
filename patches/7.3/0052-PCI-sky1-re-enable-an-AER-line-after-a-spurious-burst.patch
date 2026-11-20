@@ -1,0 +1,124 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: orangepi6 kernel-7 port
+Subject: [PATCH] PCI sky1 re enable an AER line after a spurious burst
+
+On the board the spurious AER interrupts are a short burst while the
+link comes up (64 on aer_nf in about 0.16 s, everything clear afterwards),
+yet 0045 switched the line off for the whole boot. Switch it back on 2 s
+later, up to 5 times, then leave it off for good. Cancel a pending
+re-enable on shutdown and remove.
+---
+ drivers/pci/controller/cadence/pci-sky1.c | 54 +++++++++++++++++++++++++++++--
+ drivers/pci/controller/cadence/pci-sky1.h |  4 +++
+ 2 files changed, 55 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/pci/controller/cadence/pci-sky1.c b/drivers/pci/controller/cadence/pci-sky1.c
+index 7c937836f..e253e36da 100644
+--- a/drivers/pci/controller/cadence/pci-sky1.c
++++ b/drivers/pci/controller/cadence/pci-sky1.c
+@@ -801,6 +801,33 @@ static void sky1_pcie_aer_dump(struct sky1_pcie *pcie, int irq)
+  * line was seen re-firing forever (1730 times in 19 s) until a hard lockup.
+  */
+ #define SKY1_AER_SPURIOUS_LIMIT		64
++/*
++ * On the board the storm is a burst while the link comes up (64 interrupts in
++ * about 0.16 s on aer_nf), so switch the line back on after a pause instead
++ * of losing that error class for the whole boot. Give up after a few bursts.
++ */
++#define SKY1_AER_REARM_DELAY_MS		2000
++#define SKY1_AER_REARM_MAX		5
++
++static void sky1_pcie_aer_rearm_fn(struct work_struct *work)
++{
++	struct sky1_pcie *pcie = container_of(to_delayed_work(work),
++					      struct sky1_pcie, aer_rearm_work);
++	unsigned long flags;
++	int irq;
++
++	spin_lock_irqsave(&pcie->aer_lock, flags);
++	irq = pcie->aer_off_irq;
++	pcie->aer_off_irq = 0;
++	pcie->aer_spurious = 0;
++	spin_unlock_irqrestore(&pcie->aer_lock, flags);
++	if (!irq)
++		return;
++	dev_info(pcie->dev, "AER irq %d (%s): re-enabled (%u/%u)\n", irq,
++		 sky1_pcie_aer_irq_name(pcie, irq), pcie->aer_rearms,
++		 SKY1_AER_REARM_MAX);
++	enable_irq(irq);
++}
+ 
+ static irqreturn_t sky1_pcie_aer_irq_handler(int irq, void *arg)
+ {
+@@ -853,11 +880,27 @@ static irqreturn_t sky1_pcie_aer_irq_handler(int irq, void *arg)
+ 			"spurious AER irq %d (%s), no error status (%u in a row)\n",
+ 			irq, sky1_pcie_aer_irq_name(pcie, irq), n);
+ 		if (n == SKY1_AER_SPURIOUS_LIMIT) {
++			bool rearm;
++
++			spin_lock_irqsave(&pcie->aer_lock, flags);
++			rearm = !pcie->aer_off_irq &&
++				pcie->aer_rearms < SKY1_AER_REARM_MAX;
++			if (rearm) {
++				pcie->aer_off_irq = irq;
++				pcie->aer_rearms++;
++			}
++			spin_unlock_irqrestore(&pcie->aer_lock, flags);
++
+ 			dev_err(pcie->dev,
+-				"AER irq %d (%s): %u interrupts with no error status, disabling it\n",
+-				irq, sky1_pcie_aer_irq_name(pcie, irq), n);
+-			sky1_pcie_aer_dump(pcie, irq);
++				"AER irq %d (%s): %u interrupts with no error status, disabling it%s\n",
++				irq, sky1_pcie_aer_irq_name(pcie, irq), n,
++				rearm ? " for a while" : " for good");
++			if (pcie->aer_rearms == 1 && rearm)
++				sky1_pcie_aer_dump(pcie, irq);
+ 			disable_irq_nosync(irq);
++			if (rearm)
++				schedule_delayed_work(&pcie->aer_rearm_work,
++					msecs_to_jiffies(SKY1_AER_REARM_DELAY_MS));
+ 		}
+ 		return IRQ_NONE;
+ 	}
+@@ -898,6 +941,7 @@ static int sky1_pcie_request_irq(struct sky1_pcie *pcie)
+ 	}
+ 
+ 	spin_lock_init(&pcie->aer_lock);
++	INIT_DELAYED_WORK(&pcie->aer_rearm_work, sky1_pcie_aer_rearm_fn);
+ 	ret = devm_request_threaded_irq(pcie->dev, pcie->aer_c_irq, NULL,
+ 					sky1_pcie_aer_irq_handler, IRQF_ONESHOT,
+ 					"pcie-aer-c", pcie);
+@@ -918,6 +962,9 @@ static int sky1_pcie_request_irq(struct sky1_pcie *pcie)
+ 
+ static void sky1_pcie_disable_irq(struct sky1_pcie *pcie)
+ {
++	/* A pending re-enable would undo this. */
++	cancel_delayed_work_sync(&pcie->aer_rearm_work);
++	pcie->aer_off_irq = 0;
+ 	disable_irq(pcie->local_irq);
+ 	disable_irq(pcie->aer_c_irq);
+ 	disable_irq(pcie->aer_f_irq);
+@@ -2866,6 +2913,7 @@ static void sky1_pcie_remove(struct platform_device *pdev)
+ 	struct sky1_pcie *pcie = platform_get_drvdata(pdev);
+ 	struct device *dev = &pdev->dev;
+ 
++	cancel_delayed_work_sync(&pcie->aer_rearm_work);
+ 	sky1_pcie_enable_irq(pcie, false);
+ 	pci_ecam_free(pcie->cfg);
+ 	pm_runtime_put(dev);
+diff --git a/drivers/pci/controller/cadence/pci-sky1.h b/drivers/pci/controller/cadence/pci-sky1.h
+index 2eb48e58e..d3ce1cff9 100644
+--- a/drivers/pci/controller/cadence/pci-sky1.h
++++ b/drivers/pci/controller/cadence/pci-sky1.h
+@@ -154,6 +154,10 @@ struct sky1_pcie {
+ 	bool aer_uncor_dump;
+ 	/* consecutive AER interrupts that found no error status */
+ 	unsigned int aer_spurious;
++	/* AER line switched off by the spurious-interrupt guard, re-enabled later */
++	int aer_off_irq;
++	unsigned int aer_rearms;
++	struct delayed_work aer_rearm_work;
+ 
+ 	struct phy *pcie_phy;
+ 	struct workqueue_struct *wk;

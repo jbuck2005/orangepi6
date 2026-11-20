@@ -195,6 +195,13 @@ Orion O6 / Sky1 XCP boards.
   PCIe capability registers, root control and status, the local error registers, the debug
   status register, the RCSU app status words and the IRQ trigger type when that happens.
 
+- Live readout during that run: root port status all clear (DevSta, UESta, CESta, RootSta),
+  root error reporting off (RootCmd CERptEn- NFERptEn- FERptEn-), link 16 GT/s x4 with
+  equalization complete. irq 55 is GIC SPI 437, level-triggered, and took exactly 64
+  interrupts between 5.23 s and 5.39 s. So the line is raised briefly while the link comes up,
+  by something outside the standard error registers. `0052` switches the line back on 2 s
+  after a burst (up to 5 times), so non-fatal error reporting isn't lost for the whole boot.
+
 ### Warm reboot test plan
 
 Every hang needs a ~30 s power-off. Watch the serial log from Prometheus.
