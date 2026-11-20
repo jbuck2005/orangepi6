@@ -24,6 +24,7 @@ Kernel lines:
 | NICs lost after a warm reboot need a ~30 s power cut | [2026-11-19](#2026-11-19-nic-link-training-after-warm-reboots) |
 | Software GPIO power switch for the NICs is a dead end | [2026-11-19](#2026-11-19-nic-link-training-after-warm-reboots) |
 | Kernel 7 warm reboot hangs at the watchdog | [2026-11-19](#2026-11-19-kernel-7-track-735) |
+| Board draws ~17 W idle and 30-36 W under load at the wall | [2026-11-20](#2026-11-20-power-draw) |
 | Fuzzy patching misplaced an arm_scmi hunk into a NULL dereference | [2026-11-19](#2026-11-19-kernel-61864-lts) |
 
 ---
@@ -204,6 +205,15 @@ Branch `claude/project-thread-cxukj3`, **experimental**, built from source only 
   rewritten commits, and the release assets are unchanged. The v2026.11.19.1 BUILDINFO records `f0c8401` for
   `323a39d`.
 - CONTRIBUTING.md: commits carry no attribution trailers.
+
+## 2026-11-20: power draw
+
+- `tools/plug-power.py`: read-only power report from a smart plug's power sensor in Home Assistant (min, mean and max
+  watts, and Wh, over a time window, or raw samples as CSV). It reads the sensor's history through the HA REST API,
+  never switches the plug, and never prints the URL or token. Setup is a small JSON config (see the script header).
+
+**Finding:** wall power (including the power supply), from the plug's once-a-minute readings: off ~1 W, idle ~17 W,
+kernel build ~35 W, kernel 7 load test 30-36 W, hung after an ECC error ~23 W.
 
 ## Open items
 
