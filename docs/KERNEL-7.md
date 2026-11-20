@@ -244,6 +244,23 @@ Orion O6 / Sky1 XCP boards.
   thermal throttle counts and time above the warning/critical temperature. On the next hang,
   use SysRq over the serial console (`w`, then `t`) to see whether tasks are stuck on I/O.
 
+- 2026-11-20, `cpu-diag.sh` on both kernels, same board, 6000 MT/s (pp512/tg128, tok/s):
+
+  | variant | 7.3.5 | 6.18.64 |
+  |---|---|---|
+  | as booted | 109.8 / 30.1 | 96.3 / 25.0 |
+  | LLC balancing off | 110.1 / 30.0 | n/a |
+  | EAS off | 108.8 / 30.1 | 97.4 / 24.5 |
+  | performance governor | 110.6 / 30.5 | 98.5 / 24.9 |
+  | pinned to 8 big cores | 121.3 / 34.6 | 95.7 / 25.4 |
+
+  Topology, capacities, cpufreq, sched domains, caches and cpuidle read the same on both. On
+  7.3.5 the results match the 6400 run, and only pinning helps, so its gap to 6.18.14
+  (123.8/36.6) is thread placement and not EAS, LLC balancing or the governor. 6.18.64 is slower
+  than both in every variant, and pinning does not help it. Its own 11-19 run at 6400 gave
+  123.4/36.5, and a drop from 6400 to 6000 MT/s cannot explain a 20-30% loss. So 6.18.64 has a
+  separate regression on this boot, which matters for the LTS release.
+
 ### Warm reboot test plan
 
 Every hang needs a ~30 s power-off. Watch the serial log from Prometheus.
