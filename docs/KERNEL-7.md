@@ -188,6 +188,13 @@ Orion O6 / Sky1 XCP boards.
     load on both kernels and compare the DDR temperatures, or run 7.3.5 at 6000 (the firmware's
     Auto setting) for an hour with it logging.
 
+- 2026-11-20, 6000 MT/s run (commit 5306e16): the AER storm came back at boot on sky1-pcie.2,
+  aer_nf (irq 55), with no "local err0 ... latched" line. So the latched-local-error theory
+  behind `0049` is wrong, or at least not the whole story. `0045` cut the line off at 5.39 s
+  after 64 interrupts, and the boot carried on. `0051` (debug) dumps the root port's AER and
+  PCIe capability registers, root control and status, the local error registers, the debug
+  status register, the RCSU app status words and the IRQ trigger type when that happens.
+
 ### Warm reboot test plan
 
 Every hang needs a ~30 s power-off. Watch the serial log from Prometheus.
