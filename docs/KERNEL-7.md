@@ -294,6 +294,14 @@ Orion O6 / Sky1 XCP boards.
   gap, the fix is a boot-time setting. Otherwise the next candidate is `CONFIG_UCLAMP_TASK=y`
   (off in both configs), so the benchmark can ask for big cores with `uclampset -m 1024`.
 
+- 2026-11-21, thread placement on 7.3.5: in almost every sample, 1-2 of the 8 threads sit on a
+  little core (cpu2-5) while a big core is idle; pinned, none do. Turning off `NI_RATE`,
+  `NI_RANDOM` or both changes nothing (107-111 / 30). One 7.x change to load balancing fits:
+  `update_sg_lb_stats()` now only counts a group's misfit load when the balancing CPU's capacity
+  is greater than the group's largest capacity. `0054` (experiment) goes back to the 6.18 rule.
+  If it closes the gap, the next step is to work out which group fails that test on this
+  topology (the sched-domain lines in the cpu-diag log) and fix that properly.
+
 ### Warm reboot test plan
 
 Every hang needs a ~30 s power-off. Watch the serial log from Prometheus.
