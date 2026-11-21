@@ -10,7 +10,7 @@ Kernel lines:
 |---|---|---|---|
 | 6.18.14 | kernel.org 6.18.14 + Sky1 patches (139) | `main` until PR #1 | released as **v2026.11.19**, superseded |
 | 6.18 LTS | kernel.org 6.18.64 + Sky1 patches, 5 rebased, 4 post patches | `main` (PR #1) | released as **v2026.11.19.1** (current) |
-| Kernel 7 | kernel.org 7.3.5 + our forward port of Sky1 patches-next (49 patches) | branch `claude/project-thread-cxukj3` | **experimental**, not released |
+| Kernel 7 | kernel.org 7.3.5 + our forward port of Sky1 patches-next (54 patches) | branch `kernel-7` | **experimental**, not released |
 
 ## Quick index of findings
 
@@ -24,6 +24,7 @@ Kernel lines:
 | NICs lost after a warm reboot need a ~30 s power cut | [2026-11-19](#2026-11-19-nic-link-training-after-warm-reboots) |
 | Software GPIO power switch for the NICs is a dead end | [2026-11-19](#2026-11-19-nic-link-training-after-warm-reboots) |
 | Kernel 7 warm reboot hangs at the watchdog | [2026-11-19](#2026-11-19-kernel-7-track-735) |
+| Kernel 7 AER storm: an unacked LTSSM-transition bit; CPU gap is thread placement | [2026-11-21](#2026-11-21-kernel-7-aer-fix-cpu-placement-warm-reboots-into-armbian) |
 | Board draws ~17 W idle and 30-36 W under load at the wall | [2026-11-20](#2026-11-20-power-draw) |
 | Fuzzy patching misplaced an arm_scmi hunk into a NULL dereference | [2026-11-19](#2026-11-19-kernel-61864-lts) |
 
@@ -176,7 +177,7 @@ live in Home Assistant itself. Credentials stay in a local config outside the re
 
 ## 2026-11-19: kernel 7 track (7.3.5)
 
-Branch `claude/project-thread-cxukj3`, **experimental**, built from source only (no release). Details:
+Branch `kernel-7` (named `claude/project-thread-cxukj3` until 2026-11-21), **experimental**, built from source only (no release). Details:
 `docs/KERNEL-7.md` on that branch.
 
 - `193c5c5` Linux 7.3.5 with a forward port of the Sky1 patches. Sky1-Linux has no 7.x set: its `patches-next`
@@ -239,10 +240,39 @@ address from the previous Armbian boot.
 - `install.sh stage` refuses to pin a locally administered (random) MAC and says to power the board off for 30 s and
   stage again, and the pins match `Path=*pci-<address>` so they apply under sky1. Same change on the kernel 7 branch (`55f2f7b`).
 
+## 2026-11-21: kernel 7 AER fix, CPU placement, warm reboots into Armbian
+
+Branch `kernel-7`; details in `docs/KERNEL-7.md` there.
+
+- `2b00a9e` `0050` (debug) markers in the arm64 restart and PSCI reset paths, with a warm-reboot test plan. Reboot
+  test A then passed on 7.3.5 (`77c5308`), so the watchdog hang did not come back.
+- `5f42bf0` `0051` (debug) dumps the PCIe AER and local error registers when an AER line is cut off; `f6a7895` `0052`
+  re-enables a cut-off AER line after 2 s, up to 5 times.
+- `59181e1` `0053` PCI: sky1: ack the LTSSM-transition indication (local error bit 31) that held the `aer_nf` line
+  asserted. This was the AER storm's cause. Quiet boots since, not yet seen on a boot that would have stormed.
+- `5306e16` `bench/thermal-log.sh`; `4b5e8fe`, `f355515`, `46ff62c` `bench/cpu-diag.sh` gains EAS-off and pinned
+  variants, sched-domain and cache dumps, and per-thread CPU sampling; `628a0b1` `bench/sched-ab.sh`;
+  `2cb8915`, `1c5a8b7` `bench/util-probe.sh`.
+- `95fc193` `0054` sched/topology: restore the 6.18 rule that clears `SD_PREFER_SIBLING` on the child of an
+  asymmetric-capacity domain. Flags now match 6.18.64, but the CPU gap is unchanged.
+- `55f2f7b`, `b8f6ea8` the MAC guard and `Path=*` glob pins, as on `main`.
+
+**Findings:**
+- CPU, llama.cpp 1.5B Q4, 8 threads, 6000 MT/s: 6.18.64 123.5/36.5 tok/s (pp512/tg128), 7.3.5 109.8/30.1, 7.3.5
+  pinned to the big cores 121/34.6. 1-4 threads sit on a little core while a big core idles. Ruled out: EAS, LLC
+  balancing, the governor, memory bandwidth, the newidle features, misfit accounting, the domain flags, and frequency
+  invariance (per-thread util and runtime match on both kernels). It shows only with prompt processing in the run,
+  so wake placement is next. Workaround: `taskset -c 0,1,6-11`.
+- Every warm reboot from a sky1 kernel into Armbian that night (9 of 9) failed NIC link training; SysRq over serial
+  recovered each. Armbian into sky1 always trained. Suspect: the sky1 PCIe syscore shutdown hook.
+- Silent hangs under build load happen on several kernels, including Armbian 6.18.45 at 6000 MT/s. Cause unknown.
+
 ## Open items
 
 - NPU (phase 2): the in-tree `armchina` driver already probes on the sky1 ACPI boot. Leads:
   visorcraft/orange-pi-6-plus-npu, Sky1-Linux/sky1-drivers-dkms.
-- Kernel 7: warm-reboot hang at the watchdog; CPU regression; CIX display drivers.
+- Kernel 7: CPU thread placement (~12% slower); confirm `0053` on a storming boot; CIX display drivers.
+- Warm reboots from a sky1 kernel into Armbian fail NIC link training (SysRq over serial recovers).
+- Silent hangs under build load on several kernels.
 - NIC warm-reboot link training: smart-plug workaround pending merge; a real fix would need the firmware.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.
