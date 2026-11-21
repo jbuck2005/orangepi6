@@ -28,7 +28,14 @@ cp "../linux-sky1/config/$SKY1_CONFIG" .config
 ./scripts/config --set-str LOCALVERSION "-sky1" --disable DEBUG_INFO_BTF --disable DEBUG_INFO \
   --enable DEBUG_INFO_NONE --disable DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT --disable DEBUG_INFO_DWARF5 \
   --enable PSTORE_RAM --enable PSTORE_CONSOLE --enable PSTORE_PMSG \
-  --enable NETCONSOLE --enable NETCONSOLE_DYNAMIC --enable NETPOLL --enable CONFIGFS_FS --enable R8125
+  --enable NETCONSOLE --enable NETCONSOLE_DYNAMIC --enable NETPOLL --enable CONFIGFS_FS
+# NIC driver for the two RTL8125 ports: Realtek's r8125 (default) or mainline r8169 (NIC_DRIVER=r8169,
+# experimental; it needs rtl_nic/rtl8125*.fw from linux-firmware in the root filesystem).
+case ${NIC_DRIVER:-r8125} in
+  r8125) ./scripts/config --enable R8125 --disable R8169 ;;
+  r8169) ./scripts/config --disable R8125 --enable R8169 --enable REALTEK_PHY ;;
+  *) echo "NIC_DRIVER must be r8125 or r8169"; exit 1 ;;
+esac
 make HOSTCC="$HOSTCC" CC="$CC" olddefconfig >/dev/null
 KREL=$(make -s kernelrelease)
 [ "$KREL" = "$KV-sky1" ] || { echo "unexpected kernel release $KREL (is $WORK inside a git repo?)"; exit 1; }

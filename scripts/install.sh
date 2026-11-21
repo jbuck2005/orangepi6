@@ -112,9 +112,10 @@ verify() {
   modinfo ${MODROOT:+-b "$MODROOT"} -k "$KREL" panthor >/dev/null 2>&1 || die "module panthor not found for $KREL"
   local vm; vm=$(modinfo ${MODROOT:+-b "$MODROOT"} -k "$KREL" -F vermagic panthor | awk '{print $1}')
   [ "$vm" = "$KREL" ] || die "panthor vermagic '$vm' != '$KREL'"; ok "panthor module present, vermagic matches"
-  for b in nvme ext4 pcie-sky1 phy-cix-pcie ramoops r8125 netconsole; do
+  local nic=r8125; grep -q "/r8169\.ko" "$M/modules.builtin" && nic=r8169  # NIC_DRIVER=r8169 build
+  for b in nvme ext4 pcie-sky1 phy-cix-pcie ramoops $nic netconsole; do
     grep -qE "/$b\.ko|/${b//-/_}\.ko" "$M/modules.builtin" || die "$b not built in"
-  done; ok "nvme, ext4, Sky1 PCIe host+PHY, ramoops, r8125, netconsole built in"
+  done; ok "nvme, ext4, Sky1 PCIe host+PHY, ramoops, $nic, netconsole built in"
   cmp -s "$BOOTDIR/vmlinuz" "$SRC/arch/arm64/boot/Image" || die "$BOOTDIR/vmlinuz missing or stale"; ok "kernel in $BOOTDIR matches build"
   cmp -s "$BOOTDIR/$DTB_NAME" "$SRC/arch/arm64/boot/dts/cix/$DTB_NAME" || die "DTB missing or stale"
   local D; D=$(dtc -q -I dtb -O dts "$BOOTDIR/$DTB_NAME") || die "dtc cannot read DTB"

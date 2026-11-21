@@ -317,6 +317,9 @@ The NIC power work from 2026-11-19 is now on `main`, squashed from its working b
   through a warm reset. (Every boot after a failed training also trains, which had made the controller look guilty.)
 - `post/0010` net: r8125: saves each EPHY (the chip's PCIe PHY) register before the driver first writes it and
   writes back any changed ones on a reboot, logging each. `r8125.reboot_ephy_restore=0` skips it. Not yet tested.
+- Branch `nic-r8169` (staged, not yet tried on the board): `NIC_DRIVER=r8169 scripts/02-fetch-patch.sh` builds sky1
+  with mainline `r8169` (+ `REALTEK_PHY`) instead of `r8125`, for a later comparison; `install.sh verify` and the
+  boot report accept either. No earlier sky1 build used `r8169`; Armbian's own kernel does.
 
 ## Open items
 
