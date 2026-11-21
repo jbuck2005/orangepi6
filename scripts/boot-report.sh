@@ -10,7 +10,7 @@ if [ "$MODE" = default ]; then
 fi
 {
   echo "== $(date -Is) $(uname -r) mode=$MODE"; cat /proc/cmdline
-  echo "== dmesg panthor/gpu/net/nvme"; dmesg | grep -iE 'panthor|mali|gpu|r8125|nvme' | head -80
+  echo "== dmesg panthor/gpu/net/nvme"; dmesg | grep -iE 'panthor|mali|gpu|r8125|r8169|nvme' | head -80
   echo "== /dev/dri"; ls -la /dev/dri 2>&1
   echo "== lsmod"; lsmod | grep -E 'panthor|r812|drm'
   echo "== errors"; dmesg --level=err,crit,alert,emerg | head -60

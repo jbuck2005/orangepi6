@@ -292,14 +292,56 @@ The NIC power work from 2026-11-19 is now on `main`, squashed from its working b
   longer asserts PERST# or cuts endpoint power. The PERST# GPIOs sit in the always-on domain, so the old hook left
   both RTL8125 ports in reset across the warm reset and the firmware's link training failed (LTSSM `0x40C80`).
   Power-off is unchanged. Boot option `sky1_pcie_reboot_perst=1` restores the old reboot behaviour for A/B tests.
-  Not yet tested on the board.
+  Board result: the first warm reboot from sky1 into Armbian still failed on both ports, so PERST# alone is not
+  the cause.
+
+## 2026-11-21: next warm-reboot suspects (6.18.64)
+
+- `post/0006` net: r8125: boot option `r8125.reboot_shutdown=0` skips the NIC driver's shutdown hook on a reboot.
+  Default unchanged. Tests whether the state the driver leaves in the NIC (which keeps power) breaks the firmware.
+- `post/0007` PCI: sky1: (debug) logs the refclk strap register before and after the driver writes it at probe.
+  The driver sets external-refclk, termination and divider bits there; if they survive a warm reset, the firmware
+  trains with the wrong clock setup, which would fit a link stuck in Polling. Read-only.
+- Board results: a SysRq reboot straight from sky1 (no shutdown hooks) also fails, so `0006` is moot; `pcie_aspm=off
+  r8125.aspm=0` fails; undoing every NIC config difference from Armbian (I/O enable, LTR, MRRS, AER status) fails.
+  The refclk strap reads the same before and after the driver's write, so it is not the cause either. A sky1 boot
+  whose NIC links never came up reboots into Armbian fine, which points at state the controller init leaves behind.
+- `post/0008` PCI: sky1: (debug) dumps the RCSU strap and status words at probe and before a reboot, to find it.
+  Result: the strap words before a reboot match the firmware's; only status words differ (link state). So the
+  state is in the controller or PHY, not the RCSU straps.
+- `post/0009` PCI: sky1: on a reboot, takes the x2/x1 ports (the NICs) down like the suspend path does (PME_Turn_Off,
+  link disable, PERST#, PHY off, clocks off, endpoint power off). `sky1_pcie_reboot_reset=0` turns it off, `=2`
+  applies it to all ports. Board result: FAILED at 1 and 2 (clean teardown, training still failed). Dropped.
+- A sky1 boot with r8125 kept from loading (`initcall_blacklist=rtl8125_init_module`) reboots into Armbian fine,
+  also with SysRq-b. So the bad state is something the r8125 driver leaves in the NIC chip, which keeps power
+  through a warm reset. (Every boot after a failed training also trains, which had made the controller look guilty.)
+- `post/0010` net: r8125: saves each EPHY (the chip's PCIe PHY) register before the driver first writes it and
+  writes back any changed ones on a reboot, logging each. `r8125.reboot_ephy_restore=0` skips it. Board result:
+  FAILED, and no EPHY register had changed. The NICs are RTL8125B (rev 05, XID 641).
+- With r8125 loaded but the NICs never opened (network services masked), the reboot still failed, so the state is
+  set at probe (hardware init, MCU code), not at open. `post/0011` (`r8125.no_mcu=` to skip the MCU code) was built
+  for a bisect but not run, once the r8169 test passed.
+
+## 2026-11-21: mainline r8169 for the NICs; warm reboots fixed
+
+- The sky1 kernel now uses mainline `r8169` (+ `REALTEK_PHY`, firmware `rtl_nic/rtl8125b-2.fw` from linux-firmware)
+  for the RTL8125B ports instead of Realtek's `r8125`. `NIC_DRIVER=r8125 scripts/02-fetch-patch.sh` still builds
+  the old way. No earlier sky1 build had used `r8169`; Armbian's kernel does.
+- Board result: 5 of 5 warm reboots trained both ports (3 plain sky1 -> Armbian, 1 SysRq-b, 1 sky1 -> sky1). Real
+  MACs without pins, 1 Gbit/s link, ~941 Mbit/s each way. Reports put `r8125` ahead at 2.5 Gbit/s (multi-queue);
+  noted in README/INSTALL.
+- `install.sh`: MAC `.link` pins only for an `r8125` build; with `r8169`, `stage` removes old pins and `verify`
+  checks none are left. `verify` accepts either driver as built in.
+- `docs/nic-r8125-vs-r8169.md`: the symptom, every test and what it ruled out, MAC behaviour under each driver,
+  the r8169 results, caveats (2.5 Gbit/s, `NIC_DRIVER=r8125`) and open questions. Linked from the README.
+- The debug and r8125-only experiments `post/0006`-`0010` are dropped (`0009` already was). `post/0005` stays: it
+  was in the tested build and only keeps PERST# released on a reboot.
 
 ## Open items
 
 - NPU (phase 2): the in-tree `armchina` driver already probes on the sky1 ACPI boot. Leads:
   visorcraft/orange-pi-6-plus-npu, Sky1-Linux/sky1-drivers-dkms.
 - Kernel 7: CPU thread placement (~12% slower); confirm `0053` on a storming boot; CIX display drivers.
-- Warm reboots from a sky1 kernel into Armbian fail NIC link training (SysRq over serial recovers).
 - Silent hangs under build load on several kernels.
-- NIC warm-reboot link training: smart-plug workaround on `main` (needs the RTC battery); a real fix would need the firmware.
+- Kernel 7 (`kernel-7` branch): switch its NICs to `r8169` too.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.

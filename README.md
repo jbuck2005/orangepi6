@@ -58,9 +58,12 @@ The board has a 2-pin **1.0 mm JRTC1** header with no battery holder, and the ci
 rechargeable cell. Until one is fitted, set the memory speed and power-loss behavior again after every power loss.
 
 ## Hardware notes
-- **Network:** both RTL8125 2.5 GbE ports use Realtek's `r8125` driver, built into the sky1 kernel (Armbian's own
-  kernel uses `r8169`). In ACPI mode `r8125` can't read the MAC addresses, so `install.sh stage` pins the real MACs
-  with `.link` files; **run `stage` from Armbian's kernel** (`setup.sh` checks this).
+- **Network:** both RTL8125B 2.5 GbE ports use the mainline `r8169` driver, built into the sky1 kernel (as in
+  Armbian's kernel), with the `rtl_nic/rtl8125b-2.fw` firmware from linux-firmware. Realtek's own `r8125` is still
+  available (`NIC_DRIVER=r8125` for `02-fetch-patch.sh`), but with it every warm reboot loses both ports until a
+  power cut, and it can't read the MACs in ACPI mode (`stage` then pins them with `.link` files). Trade-off:
+  reports put `r8125` ahead at 2.5 Gbit/s (it spreads traffic over several cores); at 1 Gbit/s `r8169` reaches line
+  rate (941 Mbit/s each way on our board). Full write-up: [docs/nic-r8125-vs-r8169.md](docs/nic-r8125-vs-r8169.md).
 - **NVMe / PCIe:** the Sky1 PCIe driver could hit an **AER interrupt storm** on the NVMe root port (`sky1-pcie.2`)
   right after PHY bring-up, which caused silent resets under load. `post/0003` and `post/0004` fix it (spurious
   interrupts return `IRQ_NONE`, the line is disabled after 64 in a row, and latched local errors are cleared).
@@ -81,9 +84,10 @@ rechargeable cell. Until one is fitted, set the memory speed and power-loss beha
 Details: [bench/MEMORY-AB-REPORT.md](bench/MEMORY-AB-REPORT.md) and [STATUS.md](STATUS.md).
 
 ## Known issues
-- **Network ports missing after a warm reboot:** the firmware sometimes fails PCIe link training for the RTL8125s
-  (`ip -br link` shows only `lo`, even on Armbian). Cut the power for about 30 s. Switching the NIC power rails from
-  software froze the board, so there is no software fix yet.
+- **Network ports missing after a warm reboot (fixed):** with Realtek's `r8125` driver, every warm reboot from the
+  sky1 kernel made the firmware fail PCIe link training for both RTL8125s (`ip -br link` shows only `lo`, even on
+  Armbian) until a 30 s power cut. The sky1 kernel now uses `r8169`, which doesn't do this. If you still see it
+  (for example after an `r8125` build), a second warm reboot or a power cut recovers.
 - **LLMs on the GPU:** llama.cpp on panvk is slow (~1.7 tok/s) and prompt processing fails with
   `ErrorOutOfDeviceMemory`. Use the CPU (`-dev none` in a Vulkan build).
 - **panvk** is not yet a conformant Vulkan driver, and the GPU temperature sensors don't read.
