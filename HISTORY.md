@@ -224,10 +224,22 @@ kernel build ~35 W, kernel 7 load test 30-36 W, hung after an ECC error ~23 W.
   reboot, kernel 7 experimental), the debug serial console, and the roadmap (NPU next).
 - INSTALL.md: the RTC battery note matches (no holder, non-charging, SH1.0 lead), and settings are saved with Save & Exit.
 
+## 2026-11-21: random NIC MACs survive a warm reset
+
+**Finding:** on one kernel 7 boot r8125 read an all-zero MAC, picked random ones, and the `.link` pins did not
+apply. The random MAC then stayed in the NICs over the warm reset, so Armbian's r8169 read it as the NIC's own
+address. `install.sh stage` builds the pins from what r8169 reads, so a stage run then would have pinned the random
+address. A full power-off (~30 s) makes the NICs reload their factory addresses. Why the pins did not apply on that
+boot is still open.
+
+- `install.sh stage` refuses to pin a locally administered (random) MAC and says to power the board off for 30 s and
+  stage again. Same change on the kernel 7 branch (`55f2f7b`).
+
 ## Open items
 
 - NPU (phase 2): the in-tree `armchina` driver already probes on the sky1 ACPI boot. Leads:
   visorcraft/orange-pi-6-plus-npu, Sky1-Linux/sky1-drivers-dkms.
 - Kernel 7: warm-reboot hang at the watchdog; CPU regression; CIX display drivers.
 - NIC warm-reboot link training: smart-plug workaround pending merge; a real fix would need the firmware.
+- r8125 MAC pins sometimes not applied on a sky1 boot (random MAC, which then survives a warm reset).
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.
