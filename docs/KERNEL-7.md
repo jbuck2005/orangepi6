@@ -297,7 +297,7 @@ Orion O6 / Sky1 XCP boards.
 - 2026-11-21, thread placement on 7.3.5: in almost every sample, 1-4 of the 8 threads sit on a
   little core (cpu2-5) while a big core is idle; pinned, none do. Turning off `NI_RATE`,
   `NI_RANDOM` or both changes nothing, and neither does going back to the 6.18 misfit
-  accounting (the first `0054` experiment, dropped). The `sched_verbose` dump shows the cause:
+  accounting (the first `0054` experiment, dropped). The `sched_verbose` dump showed a candidate:
   each CPU has a CLS domain (its cluster) under one MC domain with ASYM_CPUCAPACITY across all
   12 CPUs, and CLS still has `SD_PREFER_SIBLING`. 6.18's `sd_init()` cleared that flag on the
   child of an asymmetric-capacity domain; 7.x dropped the rule. Balancing at MC reads the flag
@@ -305,6 +305,35 @@ Orion O6 / Sky1 XCP boards.
   clusters, the little one included. `0054` now restores the 6.18 rule. Cross-check on 6.18.64:
   same domains and MC flags, and CLS has no `SD_PREFER_SIBLING`, so that flag is the only
   difference.
+
+- 2026-11-21, `0054` on the board (95fc193): the sched-domain flags now match 6.18.64 exactly,
+  but throughput does not change (pp512/tg128 108.8/29.9 as booted, 119.9/34.5 pinned to the big
+  cores). So the domain setup is not the cause. `0054` stays because it restores the 6.18
+  behaviour and costs nothing, but it does not fix the gap.
+- 2026-11-21, `bench/util-probe.sh` (tg only, `-p 0 -n 512 -t 8`) on both kernels: no thread
+  ran on cpu2-5 on either kernel, and both stacked two threads on some big CPUs. Per-thread
+  util_avg was 850-1018 on both, and per-thread runtime 28.5-29.3 s on both. Frequency
+  invariance (PELT util against capacity) is therefore the same on both kernels and is ruled
+  out. The little-core placement only shows up in the full pp512 + tg128 run, so it starts in
+  the prompt-processing phase or at the change between phases. Threads that land on a little
+  core during pp may stay there through tg, which would explain why tg128 is slower too. The
+  probe now takes a mode: `util-probe.sh pp` (pp only) and `util-probe.sh both` (pp512 + tg128,
+  sampled every 2 s, with a count of threads on little cores per sample). uutils `sort` (Ubuntu
+  26.04) rejects `-t=`, so the probe no longer uses it.
+- Next for the CPU gap: run `util-probe.sh pp` and `util-probe.sh both` on both kernels to see
+  when threads move to the little cores and whether their util is low at that point. The pp
+  phase has short bursts with many sleeps and wakeups between matrix ops, so wake placement
+  (`select_idle_sibling` / `select_idle_capacity`, `asym_fits_cpu`) is the next suspect. That
+  code is next to diff against 6.18. Workaround until then: `taskset -c 0,1,6-11`.
+- 2026-11-21, warm reboots: every warm reboot from a sky1 kernel (6.18.64 or 7.3.5) into Armbian
+  that night failed NIC link training (Root Port 2/3, LTSSM 0x40C80), and SysRq over serial
+  recovered all 9. Reboots from Armbian into a sky1 kernel always trained. So the sky1 kernels
+  leave the PCIe ports in a state the firmware's link training cannot recover from on reset,
+  and Armbian's driver does not. The suspect is the sky1 PCIe driver's syscore shutdown hook
+  (`sky1_pcie_syscore_op_shutdown`). It holds the endpoints in PERST and switches their power off
+  (and their power-on pin, when it is not standard), but it leaves the root port's LTSSM and
+  PHY as they are. To test: boot a sky1 kernel with that hook turned off (a one-line patch or a
+  module parameter), warm reboot into Armbian a few times, and count link training failures.
 
 ### Warm reboot test plan
 
