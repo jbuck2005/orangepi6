@@ -271,8 +271,11 @@ Orion O6 / Sky1 XCP boards.
   apply. The random MAC then survived the warm reset in the NICs, so Armbian's r8169 read it
   too. `install.sh stage` builds the pins from what r8169 reads, so a stage run now would have
   pinned the random address. It now refuses locally administered (random) MACs and says to
-  power the board off for 30 s, which reloads the factory address. Why the pins did not apply
-  on this boot is still open.
+  power the board off for 30 s, which reloads the factory address. Cause of the missed pins:
+  under sky1 the NICs' ID_PATH carries the host bridge prefix
+  (`platform-sky1-pcie.3.auto-pci-0000:61:00.0`), so the exact `Path=pci-...` never matched and
+  99-default.link applied. Earlier boots only looked right because the NICs still held the real
+  address from Armbian. The pins now match `Path=*pci-<address>`.
 
 ### Warm reboot test plan
 
