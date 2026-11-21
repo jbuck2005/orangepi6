@@ -261,6 +261,19 @@ Orion O6 / Sky1 XCP boards.
   123.4/36.5, and a drop from 6400 to 6000 MT/s cannot explain a 20-30% loss. So 6.18.64 has a
   separate regression on this boot, which matters for the LTS release.
 
+- 2026-11-20, 59181e1 boot (`0053`): no AER lines at all on sky1-pcie.2, but also no "LTSSM
+  transition indication latched" line. That line is printed whenever the bit is found set, at
+  interrupt enable or on an AER interrupt, so on this boot bit 31 never reached aer_nf. The
+  storm is intermittent (it follows a PHY-ready retry), so one quiet boot does not prove `0053`;
+  the local IRQ handler's "LTSSM_TRANS_DEBUG_CTRL_STATUS" / "ltssttran changed" lines show
+  whether the bit was handled there instead.
+- Same boot: r8125 read an all-zero MAC and picked random ones, and the `.link` pins did not
+  apply. The random MAC then survived the warm reset in the NICs, so Armbian's r8169 read it
+  too. `install.sh stage` builds the pins from what r8169 reads, so a stage run now would have
+  pinned the random address. It now refuses locally administered (random) MACs and says to
+  power the board off for 30 s, which reloads the factory address. Why the pins did not apply
+  on this boot is still open.
+
 ### Warm reboot test plan
 
 Every hang needs a ~30 s power-off. Watch the serial log from Prometheus.
