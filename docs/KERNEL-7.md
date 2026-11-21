@@ -285,6 +285,15 @@ Orion O6 / Sky1 XCP boards.
   EAS, LLC balancing and the governor are ruled out. `cpu-diag.sh` now also samples which CPU
   each busy benchmark thread is on.
 
+- Placement suspects in the 7.x scheduler, from diffing kernel/sched against 6.18.14: sched
+  domains, cache topology, EAS and LLC balancing are already ruled out. What is left is the
+  newidle balancing that lets an idle big core pull a running thread off a little core. 7.x
+  adds `NI_RATE` (newidle balancing throttled by a time-based rate) on top of `NI_RANDOM`,
+  which 6.18 already had in a simpler form. `HRTICK` is new but compiled off here.
+  `bench/sched-ab.sh` A/Bs both features at runtime through debugfs. If one of them closes the
+  gap, the fix is a boot-time setting. Otherwise the next candidate is `CONFIG_UCLAMP_TASK=y`
+  (off in both configs), so the benchmark can ask for big cores with `uclampset -m 1024`.
+
 ### Warm reboot test plan
 
 Every hang needs a ~30 s power-off. Watch the serial log from Prometheus.
