@@ -48,6 +48,8 @@ load_build() {
 # mode and picks random ones (new DHCP lease, netconsole target missing). Pin each port, by
 # PCI path, to the address Armbian's r8169 reads. Driver=r8125 means Armbian never matches.
 # The initramfs udev hook copies /etc/systemd/network/*.link, so it applies there too.
+# Under sky1 the NICs sit behind platform host bridges, so their ID_PATH gains a prefix
+# (platform-sky1-pcie.3.auto-pci-0000:61:00.0); Path= is a glob ending in the PCI address.
 LINK_PREFIX=/etc/systemd/network/10-sky1-
 write_links() {
   local n path mac drv count=0
@@ -59,7 +61,11 @@ write_links() {
     mac=$(cat "$n/address")
     [[ "$path" =~ ^pci-[0-9a-f:.]+$ ]] || die "unexpected ID_PATH '$path' for ${n##*/}"
     [[ "$mac" =~ ^([0-9a-f]{2}:){5}[0-9a-f]{2}$ ]] && [ "$mac" != 00:00:00:00:00:00 ] || die "bad MAC for ${n##*/}"
-    printf '[Match]\nDriver=r8125\nPath=%s\n\n[Link]\nMACAddress=%s\nMACAddressPolicy=none\nNamePolicy=keep kernel database onboard slot path\nAlternativeNamesPolicy=database onboard slot path\n' \
+    # A random MAC from r8125 is locally administered (bit 1 of the first byte) and survives a
+    # warm reset in the NIC, where r8169 then reads it. Never pin that; a full power-off (~30 s)
+    # makes the NIC reload its factory address.
+    (( (16#${mac:0:2} & 2) == 0 )) || die "${n##*/} has a locally administered MAC ($mac), probably a random one left by r8125 over a warm reset; power the board off for 30 s and run stage again"
+    printf '[Match]\nDriver=r8125\nPath=*%s\n\n[Link]\nMACAddress=%s\nMACAddressPolicy=none\nNamePolicy=keep kernel database onboard slot path\nAlternativeNamesPolicy=database onboard slot path\n' \
       "$path" "$mac" > "$LINK_PREFIX$path.link"
     count=$((count + 1))
   done
