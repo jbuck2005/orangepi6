@@ -311,7 +311,12 @@ The NIC power work from 2026-11-19 is now on `main`, squashed from its working b
   state is in the controller or PHY, not the RCSU straps.
 - `post/0009` PCI: sky1: on a reboot, takes the x2/x1 ports (the NICs) down like the suspend path does (PME_Turn_Off,
   link disable, PERST#, PHY off, clocks off, endpoint power off). `sky1_pcie_reboot_reset=0` turns it off, `=2`
-  applies it to all ports. Not yet tested on the board.
+  applies it to all ports. Board result: FAILED at 1 and 2 (clean teardown, training still failed). Dropped.
+- A sky1 boot with r8125 kept from loading (`initcall_blacklist=rtl8125_init_module`) reboots into Armbian fine,
+  also with SysRq-b. So the bad state is something the r8125 driver leaves in the NIC chip, which keeps power
+  through a warm reset. (Every boot after a failed training also trains, which had made the controller look guilty.)
+- `post/0010` net: r8125: saves each EPHY (the chip's PCIe PHY) register before the driver first writes it and
+  writes back any changed ones on a reboot, logging each. `r8125.reboot_ephy_restore=0` skips it. Not yet tested.
 
 ## Open items
 

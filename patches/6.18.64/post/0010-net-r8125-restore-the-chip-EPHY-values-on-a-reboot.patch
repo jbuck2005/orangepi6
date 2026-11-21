@@ -1,0 +1,97 @@
+From: jbuck2005 <59450931+jbuck2005@users.noreply.github.com>
+Subject: [PATCH] net: r8125: restore the chip's EPHY values on a reboot
+
+After a warm reboot from a kernel with this driver, the Sky1 firmware's
+link training fails on both RTL8125 ports (LTSSM in Polling.Compliance)
+until the board loses power. With the driver kept from loading
+(initcall_blacklist), the same kernel reboots fine, also with SysRq-b, so
+the bad state is something this driver leaves in the chip, which keeps
+power through the reset. Its EPHY (the chip's PCIe PHY) settings are the
+prime suspect: the vendor values differ in places from the mainline r8169
+driver's, and reboots from a kernel with r8169 always train.
+
+Save each EPHY register's value before this driver first writes it and,
+on SYSTEM_RESTART, write back any that changed, logging each one.
+"r8125.reboot_ephy_restore=0" skips the restore, for A/B tests.
+
+---
+--- a/drivers/net/ethernet/realtek/r8125/r8125.h
++++ b/drivers/net/ethernet/realtek/r8125/r8125.h
+@@ -2618,6 +2618,9 @@ struct rtl8125_private {
+         u8  NotWrMcuPatchCode;
+         u8  HwHasWrRamCodeToMicroP;
+ 
++        u16 ephy_orig[0x80];   /* EPHY values before this driver first wrote them */
++        DECLARE_BITMAP(ephy_saved, 0x80);
++
+         u16 sw_ram_code_ver;
+         u16 hw_ram_code_ver;
+ 
+--- a/drivers/net/ethernet/realtek/r8125/r8125_n.c
++++ b/drivers/net/ethernet/realtek/r8125/r8125_n.c
+@@ -313,6 +313,11 @@ module_param(s5wol, int, 0);
+ MODULE_PARM_DESC(s5wol, "Enable Shutdown Wake On Lan.");
+ 
+ /* A/B knob for warm-reboot link-training tests: 0 skips the shutdown hook on a reboot. */
++/* 0 keeps this driver's PCIe PHY (EPHY) settings in the chip across a reboot. */
++static int reboot_ephy_restore = 1;
++module_param(reboot_ephy_restore, int, 0);
++MODULE_PARM_DESC(reboot_ephy_restore, "Restore the chip's EPHY values on a reboot (default 1).");
++
+ static int reboot_shutdown = 1;
+ module_param(reboot_shutdown, int, 0);
+ MODULE_PARM_DESC(reboot_shutdown, "Run the shutdown hook on a reboot (default 1).");
+@@ -3861,6 +3866,13 @@ static void rtl8125_driver_stop(struct rtl8125_private *tp)
+ void rtl8125_ephy_write(struct rtl8125_private *tp, int RegAddr, int value)
+ {
+         int i;
++        int reg = RegAddr & EPHYAR_Reg_Mask_v2;
++
++        /* Keep the value from before our first write, for the reboot restore. */
++        if (!test_bit(reg, tp->ephy_saved)) {
++                tp->ephy_orig[reg] = rtl8125_ephy_read(tp, reg);
++                set_bit(reg, tp->ephy_saved);
++        }
+ 
+         RTL_W32(tp, EPHYAR,
+                 EPHYAR_Write |
+@@ -21077,6 +21089,29 @@ int rtl8125_close(struct net_device *dev)
+         return 0;
+ }
+ 
++/*
++ * This driver's EPHY (the chip's PCIe PHY) settings stay in the chip across
++ * a warm reset and PERST#, and with them the Sky1 firmware's link training
++ * fails (LTSSM in Polling.Compliance) until the board loses power. Put back
++ * the values the chip had before this driver wrote them.
++ */
++static void rtl8125_restore_ephy(struct rtl8125_private *tp)
++{
++        int reg, changed = 0;
++        u16 now;
++
++        for_each_set_bit(reg, tp->ephy_saved, 0x80) {
++                now = rtl8125_ephy_read(tp, reg);
++                if (now == tp->ephy_orig[reg])
++                        continue;
++                dev_info(&tp->pci_dev->dev, "reboot: ephy %02x %04x -> %04x\n",
++                         reg, now, tp->ephy_orig[reg]);
++                rtl8125_ephy_write(tp, reg, tp->ephy_orig[reg]);
++                changed++;
++        }
++        dev_info(&tp->pci_dev->dev, "reboot: %d ephy registers restored\n", changed);
++}
++
+ #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,11)
+ static void rtl8125_shutdown(struct pci_dev *pdev)
+ {
+@@ -21104,6 +21139,9 @@ static void rtl8125_shutdown(struct pci_dev *pdev)
+         rtl8125_close(dev);
+         rtl8125_disable_msi(pdev, tp);
+ 
++        if (system_state == SYSTEM_RESTART && reboot_ephy_restore)
++                rtl8125_restore_ephy(tp);
++
+         rtnl_unlock();
+ 
+         if (system_state == SYSTEM_POWER_OFF) {
