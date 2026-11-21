@@ -332,6 +332,8 @@ The NIC power work from 2026-11-19 is now on `main`, squashed from its working b
   noted in README/INSTALL.
 - `install.sh`: MAC `.link` pins only for an `r8125` build; with `r8169`, `stage` removes old pins and `verify`
   checks none are left. `verify` accepts either driver as built in.
+- `docs/nic-r8125-vs-r8169.md`: the symptom, every test and what it ruled out, MAC behaviour under each driver,
+  the r8169 results, caveats (2.5 Gbit/s, `NIC_DRIVER=r8125`) and open questions. Linked from the README.
 - The debug and r8125-only experiments `post/0006`-`0010` are dropped (`0009` already was). `post/0005` stays: it
   was in the tested build and only keeps PERST# released on a reboot.
 

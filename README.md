@@ -63,7 +63,7 @@ rechargeable cell. Until one is fitted, set the memory speed and power-loss beha
   available (`NIC_DRIVER=r8125` for `02-fetch-patch.sh`), but with it every warm reboot loses both ports until a
   power cut, and it can't read the MACs in ACPI mode (`stage` then pins them with `.link` files). Trade-off:
   reports put `r8125` ahead at 2.5 Gbit/s (it spreads traffic over several cores); at 1 Gbit/s `r8169` reaches line
-  rate (941 Mbit/s each way on our board).
+  rate (941 Mbit/s each way on our board). Full write-up: [docs/nic-r8125-vs-r8169.md](docs/nic-r8125-vs-r8169.md).
 - **NVMe / PCIe:** the Sky1 PCIe driver could hit an **AER interrupt storm** on the NVMe root port (`sky1-pcie.2`)
   right after PHY bring-up, which caused silent resets under load. `post/0003` and `post/0004` fix it (spurious
   interrupts return `IRQ_NONE`, the line is disabled after 64 in a row, and latched local errors are cleared).
