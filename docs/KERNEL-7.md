@@ -302,7 +302,9 @@ Orion O6 / Sky1 XCP boards.
   12 CPUs, and CLS still has `SD_PREFER_SIBLING`. 6.18's `sd_init()` cleared that flag on the
   child of an asymmetric-capacity domain; 7.x dropped the rule. Balancing at MC reads the flag
   from the busiest group (the child's flags), so it evens the thread count across the five
-  clusters, the little one included. `0054` now restores the 6.18 rule.
+  clusters, the little one included. `0054` now restores the 6.18 rule. Cross-check on 6.18.64:
+  same domains and MC flags, and CLS has no `SD_PREFER_SIBLING`, so that flag is the only
+  difference.
 
 ### Warm reboot test plan
 
