@@ -294,13 +294,15 @@ Orion O6 / Sky1 XCP boards.
   gap, the fix is a boot-time setting. Otherwise the next candidate is `CONFIG_UCLAMP_TASK=y`
   (off in both configs), so the benchmark can ask for big cores with `uclampset -m 1024`.
 
-- 2026-11-21, thread placement on 7.3.5: in almost every sample, 1-2 of the 8 threads sit on a
+- 2026-11-21, thread placement on 7.3.5: in almost every sample, 1-4 of the 8 threads sit on a
   little core (cpu2-5) while a big core is idle; pinned, none do. Turning off `NI_RATE`,
-  `NI_RANDOM` or both changes nothing (107-111 / 30). One 7.x change to load balancing fits:
-  `update_sg_lb_stats()` now only counts a group's misfit load when the balancing CPU's capacity
-  is greater than the group's largest capacity. `0054` (experiment) goes back to the 6.18 rule.
-  If it closes the gap, the next step is to work out which group fails that test on this
-  topology (the sched-domain lines in the cpu-diag log) and fix that properly.
+  `NI_RANDOM` or both changes nothing, and neither does going back to the 6.18 misfit
+  accounting (the first `0054` experiment, dropped). The `sched_verbose` dump shows the cause:
+  each CPU has a CLS domain (its cluster) under one MC domain with ASYM_CPUCAPACITY across all
+  12 CPUs, and CLS still has `SD_PREFER_SIBLING`. 6.18's `sd_init()` cleared that flag on the
+  child of an asymmetric-capacity domain; 7.x dropped the rule. Balancing at MC reads the flag
+  from the busiest group (the child's flags), so it evens the thread count across the five
+  clusters, the little one included. `0054` now restores the 6.18 rule.
 
 ### Warm reboot test plan
 

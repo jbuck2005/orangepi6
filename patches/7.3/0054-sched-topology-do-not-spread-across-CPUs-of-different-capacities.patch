@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: orangepi6 kernel-7 port
+Subject: [PATCH] sched topology do not spread across CPUs of different capacities
+
+On 7.3.5 one to four of eight busy threads sit on the little cores
+(capacity 279) while big cores idle, costing ~12% on llama.cpp against
+6.18. The board's domains are CLS (per cluster) under one MC domain with
+ASYM_CPUCAPACITY across all 12 CPUs, and CLS still carries
+SD_PREFER_SIBLING. 6.18's sd_init() cleared SD_PREFER_SIBLING on the
+child of an asymmetric-capacity domain; 7.x no longer does. Load
+balancing at MC takes prefer_sibling from the busiest group's flags (the
+child's), so it evens nr_running across the five clusters, little one
+included. Restore the 6.18 rule.
+---
+ kernel/sched/topology.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/kernel/sched/topology.c b/kernel/sched/topology.c
+index 3dab02539..90d2598bb 100644
+--- a/kernel/sched/topology.c
++++ b/kernel/sched/topology.c
+@@ -1999,6 +1999,17 @@ sd_init(struct sched_domain_topology_level *tl,
+ 	/*
+ 	 * Convert topological properties into behaviour.
+ 	 */
++	/*
++	 * Sky1: don't attempt to spread across CPUs of different capacities.
++	 * 6.18 cleared SD_PREFER_SIBLING on the child of an asymmetric-capacity
++	 * domain; 7.x dropped that. Load balancing at the asymmetric level
++	 * reads the busiest group's flags (the child's), so with the flag kept
++	 * it evens nr_running across the clusters and parks busy threads on
++	 * the little cores while big cores idle.
++	 */
++	if ((sd->flags & SD_ASYM_CPUCAPACITY) && sd->child)
++		sd->child->flags &= ~SD_PREFER_SIBLING;
++
+ 	if (sd->flags & SD_SHARE_CPUCAPACITY) {
+ 		sd->imbalance_pct = 110;
+ 
