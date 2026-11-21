@@ -292,7 +292,17 @@ The NIC power work from 2026-11-19 is now on `main`, squashed from its working b
   longer asserts PERST# or cuts endpoint power. The PERST# GPIOs sit in the always-on domain, so the old hook left
   both RTL8125 ports in reset across the warm reset and the firmware's link training failed (LTSSM `0x40C80`).
   Power-off is unchanged. Boot option `sky1_pcie_reboot_perst=1` restores the old reboot behaviour for A/B tests.
-  Not yet tested on the board.
+  Board result: the first warm reboot from sky1 into Armbian still failed on both ports, so PERST# alone is not
+  the cause.
+
+## 2026-11-21: next warm-reboot suspects (6.18.64)
+
+- `post/0006` net: r8125: boot option `r8125.reboot_shutdown=0` skips the NIC driver's shutdown hook on a reboot.
+  Default unchanged. Tests whether the state the driver leaves in the NIC (which keeps power) breaks the firmware.
+- `post/0007` PCI: sky1: (debug) logs the refclk strap register before and after the driver writes it at probe.
+  The driver sets external-refclk, termination and divider bits there; if they survive a warm reset, the firmware
+  trains with the wrong clock setup, which would fit a link stuck in Polling. Read-only.
+- Not yet tested on the board.
 
 ## Open items
 
