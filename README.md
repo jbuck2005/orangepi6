@@ -1,61 +1,144 @@
 # orangepi6
 
-An open GPU stack for the **Orange Pi 6** (non-Plus: 90x90 mm board, CIX P1 / CD8180, Mali-G720, 2x RTL8125),
-on Armbian userspace.
+An open, low-effort Linux install for the **Orange Pi 6** (standard, non-Plus: 90x90 mm board, CIX P1 / CD8180,
+Mali-G720, 2x RTL8125), on stock Armbian with a mainline-based kernel and fully open GPU drivers.
 
-- Kernel: Linux **6.18.14** from kernel.org plus the [Sky1-Linux/linux-sky1](https://github.com/Sky1-Linux/linux-sky1)
-  LTS patches (commit `57e018a`), built on the board. It boots in the firmware's **ACPI** mode.
-- GPU: mainline **panthor**, with Mesa from Ubuntu 26.04: **panvk** (Vulkan 1.4) and **Panfrost** (GLES 3.1).
-- No CIX vendor kernel and no closed Mali (`mali_kbase` / `libmali`) stack.
-- Armbian's own kernel stays installed as entry 0 in GRUB and as an automatic fallback.
+- **Base OS:** stock Armbian generic **UEFI arm64** image (Ubuntu 26.04 "resolute" userspace) on an NVMe SSD.
+- **Kernel:** Linux **6.18.64** (6.18 LTS) from kernel.org plus the
+  [Sky1-Linux/linux-sky1](https://github.com/Sky1-Linux/linux-sky1) patches (commit `57e018a`; the 5 that needed
+  rebasing for 6.18.64, and 4 fixes of our own, are in [patches/6.18.64/](patches/6.18.64/)). It boots in the
+  firmware's **ACPI** mode. The version is set in [kernel.conf](kernel.conf).
+- **GPU:** mainline **panthor**, with Mesa from Ubuntu 26.04: **panvk** (Vulkan 1.4) and **Panfrost** (GLES 3.1).
+  No CIX vendor kernel and no closed Mali (`mali_kbase` / `libmali`) stack.
+- **Safe by default:** Armbian's own kernel stays installed as GRUB entry 0 and as an automatic fallback.
+- **Current release:** [v2026.11.19.1](../../releases/tag/v2026.11.19.1) (6.18.64 LTS, prebuilt kernel + exact source).
 
-**To install, see [INSTALL.md](INSTALL.md).** In short: update the board firmware if it's V0.8, install Armbian,
-then run `scripts/setup.sh`.
+This repo is for the **standard Orange Pi 6 only**. Don't use the Plus device tree (`sky1-orangepi-6-plus.dtb`) on it.
+
+## Quick start
+The full guide, with every firmware step, is [INSTALL.md](INSTALL.md). In short:
+
+1. **Update the board firmware** to `opi6_bios_image_20261019` (or newer) if it shipped with V0.8.
+   See [Firmware and BIOS](#firmware-and-bios).
+2. **Install Armbian** (generic UEFI arm64, Ubuntu 26.04) on the NVMe, boot it and get on the wired network.
+3. **Run the setup script** from Armbian:
+   ```bash
+   sudo apt-get install -y git
+   git clone https://github.com/jbuck2005/orangepi6 && cd orangepi6
+   scripts/setup.sh --prebuilt     # or scripts/setup.sh to build from source (20-60 min on the board)
+   sudo reboot
+   scripts/setup.sh check          # panthor, /dev/dri/renderD128, Vulkan = panvk, GLES = Panfrost
+   ```
+
+Hands-on time is about 15 minutes. `--prebuilt` downloads the release kernel and checks it against the release's
+`SHA256SUMS`; the source path fetches kernel.org 6.18.64, checks its signature, patches it strictly (no fuzz) and
+builds it on the board. Either way the kernel goes into `/boot/sky1/` and every step is verified (`install.sh verify`).
+
+## Firmware and BIOS
+Firmware setup opens with **Esc** (or **F2**) at power-on. Check the installed version there or from Linux with
+`cat /sys/class/dmi/id/bios_version`.
+
+- **Use firmware `opi6_bios_image_20261019`** (`bios_v1.0.bin`, from orangepi.org > Orange Pi 6 > Download > BIOS),
+  flashed with `FlashUpdate.efi` from the UEFI Shell ([INSTALL.md step 1](INSTALL.md#1-update-the-board-firmware-if-it-shipped-with-v08)).
+  The shipped **V0.8** firmware (April 2026) was unstable at its default 6400 MT/s: 1,227 corrected and 1
+  uncorrectable DDR ECC errors in 3 minutes of stress, and resets under load.
+- **Memory speed:** Esc > **CIX System Manager** > **Soc Configuration** > **Memory Configuration** >
+  **Memory Data Rate**. On the 2026-10-19 firmware, `Auto` (6000 MT/s) and `6400` both passed 1 h of combined
+  build + `stress-ng` load on 6.18.64 with 0 ECC errors and 0 resets (and an earlier 4 h CPU+RAM+GPU soak at 6400).
+  We measured no speed difference for CPU, GPU or LLM work. If you're stuck on V0.8, use 5500.
+- Then **Save & Exit** (F10, then Y) and let the board boot. Don't cut the power right after changing a setting:
+  without an RTC battery (below), a power cut loses it.
+
+## RTC battery
+The board ships **without an RTC battery**, so every AC power loss resets the firmware settings: memory speed goes
+back to `Auto` (6000) and "power on after power loss" goes back to off, so the board stays off after a power cut.
+
+The board has a 2-pin **1.0 mm JRTC1** header with no battery holder, and the circuit does **not** charge the cell
+(it's diode-fed). Fit a plain **CR2032** with an **SH1.0** (JST 1.0 mm) 2-pin lead, observing polarity. Don't use a
+rechargeable cell. Until one is fitted, set the memory speed and power-loss behavior again after every power loss.
+
+## Hardware notes
+- **Network:** both RTL8125 2.5 GbE ports use Realtek's `r8125` driver, built into the sky1 kernel (Armbian's own
+  kernel uses `r8169`). In ACPI mode `r8125` can't read the MAC addresses, so `install.sh stage` pins the real MACs
+  with `.link` files; **run `stage` from Armbian's kernel** (`setup.sh` checks this).
+- **NVMe / PCIe:** the Sky1 PCIe driver could hit an **AER interrupt storm** on the NVMe root port (`sky1-pcie.2`)
+  right after PHY bring-up, which caused silent resets under load. `post/0003` and `post/0004` fix it (spurious
+  interrupts return `IRQ_NONE`, the line is disabled after 64 in a row, and latched local errors are cleared).
+- **Power draw at the wall** (including the supply): ~1 W off, ~17 W idle, 30-36 W under build or stress load.
+- **Power supply:** the official 20 V USB-C PD supply (the BIOS manual recommends 100 W).
 
 ## Results on our board
 | | |
 |---|---|
+| GPU | panthor 1.5.0, Mali-G720 MC10, CSF firmware v3.13, Mesa 26.0.8 |
 | Vulkan (vkpeak) | FP32 1.20 TFLOPS, FP16 2.11 TFLOPS, INT8 dot 4.86 TOPS |
 | glmark2-es2-drm (off-screen) | 1591 |
-| vkmark (headless) | 3460 (llvmpipe: 741) |
+| vkmark (headless) | 3460-3544 (llvmpipe: 741) |
 | llama.cpp CPU, Qwen2.5-1.5B Q4_K_M | 124 tok/s prompt, 36.6 tok/s generation |
 | llama.cpp CPU, Qwen2.5-7B Q4_K_M | 33.7 / 8.75 tok/s |
-| Memory stability | firmware 2026-10-19: 0 ECC errors at 5500/6000/6400 MT/s, including a 4 h combined soak |
+| Memory stability | firmware 2026-10-19: 0 ECC errors at 5500/6000/6400 MT/s; 1 h load at 6000 and 6400 on 6.18.64 |
 
-Details: `bench/MEMORY-AB-REPORT.md` and `STATUS.md`.
+Details: [bench/MEMORY-AB-REPORT.md](bench/MEMORY-AB-REPORT.md) and [STATUS.md](STATUS.md).
+
+## Known issues
+- **Network ports missing after a warm reboot:** the firmware sometimes fails PCIe link training for the RTL8125s
+  (`ip -br link` shows only `lo`, even on Armbian). Cut the power for about 30 s. Switching the NIC power rails from
+  software froze the board, so there is no software fix yet.
+- **LLMs on the GPU:** llama.cpp on panvk is slow (~1.7 tok/s) and prompt processing fails with
+  `ErrorOutOfDeviceMemory`. Use the CPU (`-dev none` in a Vulkan build).
+- **panvk** is not yet a conformant Vulkan driver, and the GPU temperature sensors don't read.
+- **Kernel 7 (7.3.5) is experimental and not shipped:** it boots with the GPU working, but a warm reboot hangs
+  after "watchdog did not stop", and CPU throughput is 12-20% lower (work lands on the little cores). Use 6.18.64.
+
+## Debug serial console
+The **2x2 "DEBUG" header** just below the left network jack is UART2: 3.3 V, **115200 8N1**. The row nearest the
+jack is RX (left) and TX (right); the far row is GND. Cross TX/RX to a 3.3 V USB-serial adapter and leave its VCC
+unconnected. The firmware, GRUB and the sky1 kernel all log there. The firmware has no SPCR table, so serial test
+boots (`SERIAL=1 scripts/install.sh arm acpi`) use `earlycon=pl011,mmio32,0x040d0000`.
+`bench/serial-log.ps1` is a timestamping logger for Windows.
+
+## Roadmap
+- **Phase 1, GPU:** done (2026-11-18), released as v2026.11.19 and v2026.11.19.1.
+- **Phase 2, NPU:** next. The in-tree `armchina` driver already probes on the sky1 ACPI boot. Leads:
+  [visorcraft/orange-pi-6-plus-npu](https://github.com/visorcraft/orange-pi-6-plus-npu),
+  [Sky1-Linux/sky1-drivers-dkms](https://github.com/Sky1-Linux/sky1-drivers-dkms).
+- Ruled out: the CIX/Canonical vendor kernel and closed Mali stack, NCZ-OS, and the original Orange Pi vendor image
+  (it didn't boot on this board). See [HISTORY.md](HISTORY.md).
+
+## History
+[HISTORY.md](HISTORY.md) records every patch, change, release and finding to date, in order. It is updated with every
+change (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ## Layout
 | Path | What |
 |---|---|
-| `scripts/setup.sh` | one-command install from stock Armbian (preflight, packages, source, build, stage, default, check) |
+| `scripts/setup.sh` | one-command install from stock Armbian (preflight, packages, source, build, stage, default, check); `--prebuilt` uses the release |
 | `scripts/02-fetch-patch.sh`, `03-build.sh` | kernel source (signature checked), Sky1 patches, our DTS, config; build at `-j6` |
-| `scripts/install.sh` | `stage`, `verify`, `default`/`undefault`, one-time test boots (`arm acpi\|dt`, `disarm`), `bootlog` |
-| `scripts/boot-report.sh` | confirms default boots (clears GRUB's fallback mark); network fallback for test boots |
+| `scripts/install.sh` | `stage`, `verify`, `default`/`undefault`, one-time test boots (`arm acpi\|dt`, `disarm`), `bootlog`, `prune` |
+| `scripts/boot-report.sh` | confirms the default boot (clears GRUB's fallback mark); network fallback for test boots |
+| `scripts/gpu-test.sh` | vulkaninfo, glmark2 and vkmark, results to `/var/log/sky1-gpu-test.txt` |
+| `scripts/package-release.sh` | builds the release tarballs and `SHA256SUMS` |
+| `kernel.conf` | kernel version and Sky1 patch track used by every script |
+| `patches/6.18.64/` | rebased Sky1 patches; `post/` holds our fixes (syscore API, r8125 netpoll, AER storm) |
 | `initramfs/`, `scripts/bootlog-area.sh` | early-boot logger: writes the kernel log to a raw disk area before root is mounted |
 | `dts/sky1-orangepi-6.dts` | non-Plus device tree (for the optional DT/`acpi=off` route) |
 | `bench/` | benchmark and memory-soak suite, Windows UART logger, A/B report |
-| `tools/` | netconsole listener and self-test |
+| `tools/` | netconsole listener and self-test; read-only smart-plug power report (`plug-power.py`) |
 | `scripts/01-toolchain.sh` | unprivileged toolchain from Ubuntu debs (only needed without root; `setup.sh` uses apt instead) |
 
-## Safety and verification
-`install.sh verify` fails loudly if anything is missing or mismatched. It checks:
-- the module tree and panthor vermagic for the exact release
-- the built-in boot and network drivers
-- that `/boot/sky1` matches the build
-- that the DTB model is right
-- that the initrd's tools run inside the initrd, with nothing leaked from the build environment
-- the boot logger, by a self-test with the initrd's own `dd`
-- the NIC MAC pins: present in the initrd, inert under Armbian
-- the Mali firmware
+## How the fallback works
+GRUB marks every sky1 boot as pending, and `sky1-boot-report.service` clears the mark once userspace is up. If the
+mark is still set at the next boot (a hang, panic or power loss), GRUB boots **Armbian** instead and keeps it as the
+default until you run `scripts/install.sh default` again. `scripts/install.sh undefault` makes Armbian the default
+for good. GRUB changes are generated into a temp file and checked (`grub-script-check`, Armbian is still entry 0)
+before they're installed.
 
-GRUB changes are generated into a temp file, checked (`grub-script-check`, Armbian is still entry 0, the entries
-are present), and only then installed.
+## Safety and verification
+`install.sh verify` fails loudly if anything is missing or mismatched. It checks the module tree and panthor
+vermagic for the exact release, the built-in boot and network drivers, that `/boot/sky1` matches the build, the DTB
+model, that the initrd's tools run inside the initrd with nothing leaked from the build environment, the boot logger
+(by a self-test with the initrd's own `dd`), the NIC MAC pins, and the Mali firmware.
 
 ## Device-tree route
-Earlier notes said the GPU only powers on with `acpi=off` and a device tree (as documented for the Plus by
-visorcraft). With the Sky1-Linux patches, the GPU is powered through SCMI in ACPI mode too, so the DT route isn't
-needed. It's still available as a one-time test boot: `install.sh arm dt`.
-
-## Known issues
-See [INSTALL.md](INSTALL.md#known-issues): flaky NIC link training on warm reboots, slow and limited LLM inference on
-panvk, panvk not yet conformant, and no GPU temperature readout.
+With the Sky1 patches, the GPU is powered through SCMI in ACPI mode, so the `acpi=off` + device-tree route
+documented for the Plus isn't needed. It's still available as a one-time test boot: `install.sh arm dt`.

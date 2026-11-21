@@ -6,6 +6,7 @@
 #   sudo WORK=...                     scripts/install.sh arm dt     # GRUB entry (device tree, GPU) as LAST entry, arm ONE boot
 #   sudo WORK=...                     scripts/install.sh arm acpi   # same kernel in ACPI mode (diagnostic: kernel/initrd OK?)
 #   sudo                              scripts/install.sh disarm     # remove the entry, clear next_entry
+#   sudo                              scripts/install.sh prune      # after a passed check: drop older sky1 module trees
 #   sudo                              scripts/install.sh bootlog    # print the raw boot log written by the last test boot
 #
 # Kernel, initrd and DTB live in /boot/sky1/, so Armbian's 10_linux never generates entries for them.
@@ -18,6 +19,8 @@ ok()   { echo "  ok: $*"; }
 need_root() { [ "$(id -u)" -eq 0 ] || die "run with sudo"; }
 
 REPO=$(cd "$(dirname "$0")/.." && pwd)
+# shellcheck disable=SC1091
+. "$REPO/kernel.conf"
 DTB_NAME=sky1-orangepi-6.dtb
 BOOTDIR=${BOOTDIR:-/boot/sky1}
 MODROOT=${MODROOT:-}   # test hook: alternate root for /lib/modules
@@ -30,7 +33,7 @@ NETCON_CONF=/etc/sky1-netconsole.conf
 
 load_build() {
   : "${WORK:?set WORK to the build directory}"
-  SRC=$WORK/linux-6.18.14
+  SRC=$WORK/linux-$KV
   [ -f "$SRC/include/config/kernel.release" ] || die "no kernel.release; build not finished"
   KREL=$(cat "$SRC/include/config/kernel.release")
   [ -n "$KREL" ] || die "empty kernel release"
@@ -45,6 +48,8 @@ load_build() {
 # mode and picks random ones (new DHCP lease, netconsole target missing). Pin each port, by
 # PCI path, to the address Armbian's r8169 reads. Driver=r8125 means Armbian never matches.
 # The initramfs udev hook copies /etc/systemd/network/*.link, so it applies there too.
+# Under sky1 the NICs sit behind platform host bridges, so their ID_PATH gains a prefix
+# (platform-sky1-pcie.3.auto-pci-0000:61:00.0); Path= is a glob ending in the PCI address.
 LINK_PREFIX=/etc/systemd/network/10-sky1-
 write_links() {
   local n path mac drv count=0
@@ -56,7 +61,11 @@ write_links() {
     mac=$(cat "$n/address")
     [[ "$path" =~ ^pci-[0-9a-f:.]+$ ]] || die "unexpected ID_PATH '$path' for ${n##*/}"
     [[ "$mac" =~ ^([0-9a-f]{2}:){5}[0-9a-f]{2}$ ]] && [ "$mac" != 00:00:00:00:00:00 ] || die "bad MAC for ${n##*/}"
-    printf '[Match]\nDriver=r8125\nPath=%s\n\n[Link]\nMACAddress=%s\nMACAddressPolicy=none\nNamePolicy=keep kernel database onboard slot path\nAlternativeNamesPolicy=database onboard slot path\n' \
+    # A random MAC from r8125 is locally administered (bit 1 of the first byte) and survives a
+    # warm reset in the NIC, where r8169 then reads it. Never pin that; a full power-off (~30 s)
+    # makes the NIC reload its factory address.
+    (( (16#${mac:0:2} & 2) == 0 )) || die "${n##*/} has a locally administered MAC ($mac), probably a random one left by r8125 over a warm reset; power the board off for 30 s and run stage again"
+    printf '[Match]\nDriver=r8125\nPath=*%s\n\n[Link]\nMACAddress=%s\nMACAddressPolicy=none\nNamePolicy=keep kernel database onboard slot path\nAlternativeNamesPolicy=database onboard slot path\n' \
       "$path" "$mac" > "$LINK_PREFIX$path.link"
     count=$((count + 1))
   done
@@ -166,6 +175,8 @@ stage() {
     make -C "$SRC" HOSTCC="$HOSTCC" CC="$CC" -s modules_install
   fi
   depmod "$KREL"
+  # Module trees of earlier sky1 releases stay until the new kernel has booted and passed
+  # `setup.sh check`, which then runs `install.sh prune`.
   install -d "$BOOTDIR"
   install -m644 "$SRC/arch/arm64/boot/Image" "$BOOTDIR/vmlinuz"
   install -m644 "$SRC/arch/arm64/boot/dts/cix/$DTB_NAME" "$BOOTDIR/$DTB_NAME"
@@ -190,6 +201,7 @@ stage() {
   install -m755 "$REPO/scripts/boot-report.sh" /usr/local/sbin/sky1-boot-report
   install -m644 "$REPO/systemd/sky1-boot-report.service" /etc/systemd/system/
   systemctl daemon-reload; systemctl enable -q sky1-boot-report.service
+  sync   # modules, /boot/sky1 and the initrd must be on disk before anyone reboots
   verify
 }
 
@@ -352,7 +364,7 @@ check_disarmed() {  # $1 = grub.cfg
   local first
   grub-script-check "$1" || die "grub-script-check failed on $1"
   ! grep -q "$ENTRY_PREFIX" "$1" || die "test entry still in $1"
-  ! grep -q '6.18.14-sky1' "$1" || die "sky1 kernel still referenced in $1"
+  ! grep -q "$KV-sky1" "$1" || die "sky1 kernel still referenced in $1"
   first=$(grep -m1 -E '^[[:space:]]*(menuentry|submenu) ' "$1")
   grep -q "Armbian GNU/Linux, with Linux $(uname -r)'" <<<"$first" || die "first entry is not the running Armbian kernel: $first"
   ok "grub.cfg: only Armbian entries, running kernel is entry 0"
@@ -377,6 +389,18 @@ arm() {  # $1 = mode
   ok "armed for ONE boot; afterwards GRUB falls back to entry 0 (Armbian)"
 }
 
+prune() {  # remove module trees of sky1 releases other than the one running now
+  need_root
+  local cur old n=0; cur=$(uname -r)
+  case "$cur" in *-sky1) ;; *) die "running $cur: prune only from a sky1 kernel that has passed setup.sh check";; esac
+  [ "$(cat "$BOOTDIR/kernel.release" 2>/dev/null)" = "$cur" ] || die "$BOOTDIR holds a different kernel than the running $cur"
+  for old in "$MODROOT"/lib/modules/*-sky1 "$MODROOT"/lib/modules/*-sky1+; do
+    [ -d "$old" ] && [ "${old##*/}" != "$cur" ] || continue
+    rm -rf "$old"; ok "removed old modules ${old##*/}"; n=$((n+1))
+  done
+  [ "$n" -gt 0 ] || ok "no old sky1 modules"
+}
+
 disarm() {
   need_root
   rm -f "$GRUB_SNIPPET" /etc/grub.d/06_sky1
@@ -399,9 +423,10 @@ case "${1:-}" in
   disarm) disarm ;;
   default) make_default ;;
   undefault) unmake_default ;;
+  prune) prune ;;
   bootlog)
     echo "== GRUB markers: $(grub-editenv list | grep -E '^sky1_(picked|stage|pending|failed)=' | tr '\n' ' ' || true)"
     grub-editenv list | grep -q '^sky1_picked=' || echo "   (none: GRUB has not booted the test entry since arming)"
     "$REPO/scripts/bootlog-area.sh" read "$BOOTLOG_CONF" ;;
-  *) echo "usage: $0 stage|verify|arm dt|arm acpi|disarm|default|undefault|bootlog"; exit 2 ;;
+  *) echo "usage: $0 stage|verify|arm dt|arm acpi|disarm|default|undefault|prune|bootlog"; exit 2 ;;
 esac

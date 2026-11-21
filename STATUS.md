@@ -11,6 +11,28 @@
 - [ ] Device-tree boot (`arm dt`): not needed for the GPU after all, since the Sky1 patches power the GPU in ACPI mode
 - [x] sky1 is the default boot (`install.sh default`), with automatic fallback to Armbian
 
+## Kernel 6.18.64 LTS (branch lts-6.18)
+- [x] The Sky1-Linux 6.18.14 patches rebased onto 6.18.64 with a 3-way merge. 134 of 139 apply unchanged; 5 are
+      refreshed in `patches/6.18.64/` (conflicts in alc269 audio, macb ACPI ID includes and arm_scmi ACPI resolved by
+      hand; 0011 irqchip/iommu and 0118 smmu-v3 merged without conflicts). Patching is strict: no fuzz.
+- [x] 6.18.64 has the stable backport of the new syscore API (`register_syscore`, callbacks take `void *data`).
+      `patches/6.18.64/post/0001` converts the Sky1 PDC irqchip and PCIe drivers, as the Sky1 6.19 track does.
+- [x] Cross-compile check for arm64 (compile only; the board build is native)
+- [x] Board test (native build, gcc 15.2): 6.18.64-sky1 boots in ACPI mode; panthor, panvk and Panfrost OK
+      (`setup.sh check`); NVMe, all 3 PCIe links (SMMU bypass STEs, no AER/SMMU faults) and both RTL8125 NICs up.
+      Benchmarks match 6.18.14: vkpeak FP32 1205 GFLOPS, vkmark 3544.
+- [x] netconsole warned once at boot ("exceeded budget in poll"): the r8125 "other" MSI-X vector reported work at
+      netpoll's budget of 0. Fixed in `patches/6.18.64/post/0002`.
+- [x] Two silent resets under -j6 build load on 6.18.64 before the fixes. A later boot showed the cause: a sky1-pcie.2
+      (NVMe) AER interrupt storm with nothing in the AER registers, right after "waiting PHY is ready! retries = 1",
+      the same as the first kernel-7 boot. From kernel-7: `post/0003` returns IRQ_NONE for such interrupts, disables
+      the line after 64 in a row and rate-limits AER logging; `post/0004` clears local errors latched during PHY
+      bring-up (masked from the local IRQ, so nothing else cleared them).
+- [x] With the fixes (323a39d): 1 h load tests (kernel build at -j6, then `stress-ng --vm 6 --cpu 6`) at 6000 and
+      6400 MT/s, 0 resets, 0 ECC errors, no AER storm, peak 70 °C. RAM speed was not the cause.
+- [x] A reset 2 min after a build left every `.ko` zero-length (ext4 delayed allocation, caught by `install.sh
+      verify`). Build and stage now `sync`.
+
 ### What it took (all checked by `install.sh verify`)
 - The initramfs must be built with a clean environment. The toolchain's `LD_LIBRARY_PATH` made
   `copy_exec` pack libcrypto under the build tree, so modprobe/udevd failed and init exited.
