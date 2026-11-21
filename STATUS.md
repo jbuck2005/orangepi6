@@ -37,8 +37,9 @@
 - The initramfs must be built with a clean environment. The toolchain's `LD_LIBRARY_PATH` made
   `copy_exec` pack libcrypto under the build tree, so modprobe/udevd failed and init exited.
 - The initramfs `dd` is klibc's: no `conv=fsync`. The boot logger flushes explicitly instead.
-- The vendor r8125 driver can't read the NICs' MACs in ACPI mode and picks random ones. `.link`
-  files (match `Driver=r8125` + PCI path) pin the real MACs, and they are inert under Armbian's r8169.
+- The NICs (RTL8125B, rev 05) now use mainline r8169, which reads the real MACs. With an r8125 build
+  (`NIC_DRIVER=r8125`), that driver can't read them in ACPI mode, so `stage` pins them with `.link` files
+  (match `Driver=r8125` + PCI path).
 
 ### Debugging aids
 - Debug UART: the 2x2 `DEBUG` header next to the left RJ45 (UART2, 3.3 V, 115200 8N1).
@@ -46,8 +47,10 @@
   `earlycon=pl011,mmio32,0x040d0000` (`SERIAL=1 install.sh arm ...`).
 - The GRUB test entry saves `sky1_picked`/`sky1_stage` to grubenv. `install.sh bootlog` prints them
   with the raw-disk boot log.
-- Known flake: firmware PCIe link training for the NICs sometimes fails after a warm reboot, and then there's
-  no network at all, even on Armbian. Serial log (40 firmware boots, 2026-11-17..19): 5 failures, every one right
+- FIXED 2026-11-21 (r8169 default): firmware PCIe link training for the NICs failed after every warm reboot
+  from a sky1 kernel with r8125, and then there was no network at all, even on Armbian. Cause: state r8125 sets in
+  the chip at probe (it also fails with the NICs never opened); not PERST#, the shutdown hooks, ASPM, the NIC config
+  space, EPHY or the PCIe controller. With r8169: 5 of 5 reboots trained. Earlier notes: Serial log (40 firmware boots, 2026-11-17..19): 5 failures, every one right
   after a sky1 session, both ports `Ltssm State:40C80` = Polling.Compliance (receiver detected, NIC silent).
   Empty ports read 40080 = Detect.Quiet. A 30 s power-off fixes it. The NIC rails are switched by GPIO038/039
   (S5 GPIO0 lines 27/28, schematic p19-20; firmware drives them as outputs, high). Switching them from

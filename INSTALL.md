@@ -81,10 +81,11 @@ scripts/gpu-test.sh           # optional: vulkaninfo, glmark2, vkmark
 - `scripts/install.sh bootlog` shows the GRUB markers and the raw early-boot log of the last sky1 boot.
 
 ## Known issues
-- **Network ports missing after a reboot:** the firmware sometimes fails PCIe link training for the RTL8125s on a
-  warm reboot (`ip -br link` shows only `lo`; the serial console shows `Root Port 2/3: Link Up Fail,Ltssm State:40C80`).
-  It happens on both the V0.8 and the 2026-10-19 firmware, and only after a session that used the NICs. The fix is
-  cutting the power for about 30 s. To automate it, put the board on a smart plug with a local HTTP API (Shelly Gen2+/Gen3
+- **Network ports missing after a reboot (fixed by the `r8169` default):** with Realtek's `r8125` driver
+  (`NIC_DRIVER=r8125` builds), every warm reboot from the sky1 kernel makes the firmware fail PCIe link training for
+  the RTL8125s (`ip -br link` shows only `lo`; the serial console shows `Root Port 2/3: Link Up Fail,Ltssm State:40C80`).
+  The state `r8125` sets in the chip when it loads survives the reset. The sky1 kernel now uses `r8169`, which
+  doesn't do this. A second warm reboot usually recovers; otherwise cut the power for about 30 s. To automate that, put the board on a smart plug with a local HTTP API (Shelly Gen2+/Gen3
   with its cloud switched off, or a Tasmota plug) and run `tools/plug-watch.ps1` on the PC that logs the serial
   console: it power-cycles the board when the firmware reports the failure (at most 3 times an hour), and
   `-Once` does a cycle by hand. `tools/plug-powercycle.sh` does a single cycle from Linux. The plug's address
@@ -100,8 +101,11 @@ scripts/gpu-test.sh           # optional: vulkaninfo, glmark2, vkmark
   fails with `ErrorOutOfDeviceMemory`. Use the CPU for now: Qwen2.5-1.5B Q4 runs at ~124 tok/s for prompts and ~37 tok/s
   for generation, and 7B at ~34/9 tok/s. In a Vulkan build, pass `-dev none`.
 - **panvk** is not yet a conformant Vulkan driver. GPU temperature sensors don't read.
-- After the kernel takes over, the vendor `r8125` driver can't read the NICs' MAC addresses. `stage` pins the real
-  MACs from Armbian, so **run `stage` from Armbian's kernel** (`setup.sh` checks this).
+- Only with an `r8125` build: that driver can't read the NICs' MAC addresses, so `stage` pins the real MACs from
+  Armbian. **Run `stage` from Armbian's kernel** (`setup.sh` checks this).
+- **2.5 Gbit/s:** reports put `r8125` ahead of `r8169` at 2.5 Gbit/s (it spreads traffic over several cores). At
+  1 Gbit/s `r8169` reaches line rate. If you need full 2.5 G throughput and can live with the reboot issue, build with
+  `NIC_DRIVER=r8125`.
 
 ## Debug serial console (optional)
 The **2x2 "DEBUG" header** sits just below the left network jack. The row nearest the jack is RX (left) and TX
