@@ -1,0 +1,51 @@
+From: jbuck2005 <59450931+jbuck2005@users.noreply.github.com>
+Subject: [PATCH] PCI: sky1: keep PERST# deasserted on a warm reboot
+
+The syscore shutdown hook asserts PERST# on every controller, also on a
+warm reboot. The PERST# GPIOs are in the always-on S5 domain, so they stay
+asserted through the reset, and the firmware's next link training fails for
+both RTL8125 ports (LTSSM in Polling.Compliance, 0x40C80) until the board
+loses power. Seen 9 of 9 times on warm reboots from this kernel into
+Armbian, and never on reboots from Armbian (whose generic host driver does
+not touch PERST#).
+
+On SYSTEM_RESTART only disable the controller interrupts and leave the
+endpoints alone. Power-off keeps the old behaviour. The boot option
+"sky1_pcie_reboot_perst=1" restores it for reboots too, for A/B tests.
+
+---
+--- a/drivers/pci/controller/cadence/pci-sky1.c
++++ b/drivers/pci/controller/cadence/pci-sky1.c
+@@ -2461,11 +2461,32 @@ static struct pci_ops sky1_pcie_own_ops = {
+ 	.write = pci_generic_config_write,
+ };
+ 
++/*
++ * On a warm reboot, leave the endpoints running with PERST# deasserted, as a
++ * kernel without this driver does. Asserting PERST# here leaves it asserted
++ * through the reset (the GPIO is in the always-on S5 domain), and the
++ * firmware's next link training then fails for the RTL8125 ports (LTSSM stuck
++ * in Polling.Compliance) until the board loses power.
++ * "sky1_pcie_reboot_perst=1" restores the old behaviour.
++ */
++static bool sky1_pcie_reboot_perst;
++
++static int __init sky1_pcie_reboot_perst_setup(char *str)
++{
++	return kstrtobool(str, &sky1_pcie_reboot_perst) == 0;
++}
++__setup("sky1_pcie_reboot_perst=", sky1_pcie_reboot_perst_setup);
++
+ static int _sky1_pcie_syscore_op_shutdown(struct sky1_pcie *pcie)
+ {
+ 	if (!pcie->is_probe)
+ 		return 0;
+ 
++	if (system_state == SYSTEM_RESTART && !sky1_pcie_reboot_perst) {
++		sky1_pcie_disable_irq(pcie);
++		return 0;
++	}
++
+ 	sky1_pcie_disable_irq(pcie);
+ 	sky1_pcie_reset_ep_assert(pcie);
+ 	if (!pcie->std_pwron)

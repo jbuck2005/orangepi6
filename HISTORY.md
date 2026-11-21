@@ -286,6 +286,14 @@ The NIC power work from 2026-11-19 is now on `main`, squashed from its working b
 - INSTALL.md and STATUS.md describe the workaround and that it needs an RTC battery: without one a power cut resets
   the firmware settings and the board stays off after the plug comes back on.
 
+## 2026-11-21: keep PERST# released on a warm reboot (6.18.64)
+
+- `post/0005` PCI: sky1: on a reboot, the syscore shutdown hook now only disables the controller interrupts and no
+  longer asserts PERST# or cuts endpoint power. The PERST# GPIOs sit in the always-on domain, so the old hook left
+  both RTL8125 ports in reset across the warm reset and the firmware's link training failed (LTSSM `0x40C80`).
+  Power-off is unchanged. Boot option `sky1_pcie_reboot_perst=1` restores the old reboot behaviour for A/B tests.
+  Not yet tested on the board.
+
 ## Open items
 
 - NPU (phase 2): the in-tree `armchina` driver already probes on the sky1 ACPI boot. Leads:
