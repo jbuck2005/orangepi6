@@ -50,8 +50,13 @@ for p in /sys/devices/system/cpu/cpufreq/policy*; do
        "boost=$(cat $p/boost 2>/dev/null || cat /sys/devices/system/cpu/cpufreq/boost 2>/dev/null || echo n/a)"
 done
 echo "== sched domains (cpu0, cpu2):"
-sudo sh -c 'for c in 0 2; do for d in /sys/kernel/debug/sched/domains/cpu$c/domain*; do
-  echo "cpu$c ${d##*/} $(cat $d/name 2>/dev/null) flags=$(cat $d/flags 2>/dev/null)"; done; done'
+# The domains directory only exists while sched/verbose is on; turn it on briefly.
+sudo sh -c 'v=/sys/kernel/debug/sched/verbose; old=$(cat $v 2>/dev/null); echo Y > $v 2>/dev/null
+  for c in 0 2 6 8 10; do for d in /sys/kernel/debug/sched/domains/cpu$c/domain*; do
+    [ -d "$d" ] && echo "cpu$c ${d##*/} $(cat $d/name) span=$(cat $d/span 2>/dev/null) flags=$(cat $d/flags)"; done; done
+  [ -n "$old" ] && echo $old > $v'
+echo "== kernel topology messages:"
+sudo dmesg | grep -iE "sched_domain|topology|span|borken|asym|capacity" | head -20
 echo "== cache levels (cpu0, cpu2):"
 for c in 0 2; do for i in /sys/devices/system/cpu/cpu$c/cache/index*; do
   echo "cpu$c ${i##*/} L$(cat $i/level) $(cat $i/type) $(cat $i/size) shared=$(cat $i/shared_cpu_list)"
