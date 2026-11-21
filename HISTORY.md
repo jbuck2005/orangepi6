@@ -229,11 +229,15 @@ kernel build ~35 W, kernel 7 load test 30-36 W, hung after an ECC error ~23 W.
 **Finding:** on one kernel 7 boot r8125 read an all-zero MAC, picked random ones, and the `.link` pins did not
 apply. The random MAC then stayed in the NICs over the warm reset, so Armbian's r8169 read it as the NIC's own
 address. `install.sh stage` builds the pins from what r8169 reads, so a stage run then would have pinned the random
-address. A full power-off (~30 s) makes the NICs reload their factory addresses. Why the pins did not apply on that
-boot is still open.
+address. A full power-off (~30 s) makes the NICs reload their factory addresses.
+
+**Cause:** the pins never matched under sky1. There the NICs sit behind platform host bridges, so udev's ID_PATH
+is `platform-sky1-pcie.3.auto-pci-0000:61:00.0`, not `pci-0000:61:00.0`, and 99-default.link applied instead
+(hashed, locally administered MACs). Earlier boots only looked right because the NICs still held the real
+address from the previous Armbian boot.
 
 - `install.sh stage` refuses to pin a locally administered (random) MAC and says to power the board off for 30 s and
-  stage again. Same change on the kernel 7 branch (`55f2f7b`).
+  stage again, and the pins match `Path=*pci-<address>` so they apply under sky1. Same change on the kernel 7 branch (`55f2f7b`).
 
 ## Open items
 
@@ -241,5 +245,4 @@ boot is still open.
   visorcraft/orange-pi-6-plus-npu, Sky1-Linux/sky1-drivers-dkms.
 - Kernel 7: warm-reboot hang at the watchdog; CPU regression; CIX display drivers.
 - NIC warm-reboot link training: smart-plug workaround pending merge; a real fix would need the firmware.
-- r8125 MAC pins sometimes not applied on a sky1 boot (random MAC, which then survives a warm reset).
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.
