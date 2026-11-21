@@ -307,6 +307,11 @@ The NIC power work from 2026-11-19 is now on `main`, squashed from its working b
   The refclk strap reads the same before and after the driver's write, so it is not the cause either. A sky1 boot
   whose NIC links never came up reboots into Armbian fine, which points at state the controller init leaves behind.
 - `post/0008` PCI: sky1: (debug) dumps the RCSU strap and status words at probe and before a reboot, to find it.
+  Result: the strap words before a reboot match the firmware's; only status words differ (link state). So the
+  state is in the controller or PHY, not the RCSU straps.
+- `post/0009` PCI: sky1: on a reboot, takes the x2/x1 ports (the NICs) down like the suspend path does (PME_Turn_Off,
+  link disable, PERST#, PHY off, clocks off, endpoint power off). `sky1_pcie_reboot_reset=0` turns it off, `=2`
+  applies it to all ports. Not yet tested on the board.
 
 ## Open items
 
