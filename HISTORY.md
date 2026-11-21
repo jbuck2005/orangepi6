@@ -302,7 +302,11 @@ The NIC power work from 2026-11-19 is now on `main`, squashed from its working b
 - `post/0007` PCI: sky1: (debug) logs the refclk strap register before and after the driver writes it at probe.
   The driver sets external-refclk, termination and divider bits there; if they survive a warm reset, the firmware
   trains with the wrong clock setup, which would fit a link stuck in Polling. Read-only.
-- Not yet tested on the board.
+- Board results: a SysRq reboot straight from sky1 (no shutdown hooks) also fails, so `0006` is moot; `pcie_aspm=off
+  r8125.aspm=0` fails; undoing every NIC config difference from Armbian (I/O enable, LTR, MRRS, AER status) fails.
+  The refclk strap reads the same before and after the driver's write, so it is not the cause either. A sky1 boot
+  whose NIC links never came up reboots into Armbian fine, which points at state the controller init leaves behind.
+- `post/0008` PCI: sky1: (debug) dumps the RCSU strap and status words at probe and before a reboot, to find it.
 
 ## Open items
 

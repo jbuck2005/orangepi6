@@ -1,0 +1,106 @@
+From: jbuck2005 <59450931+jbuck2005@users.noreply.github.com>
+Subject: [PATCH] PCI: sky1: (debug) dump the RCSU strap and status words
+
+A warm reboot from this kernel breaks the firmware's link training on the
+RTL8125 ports, also with SysRq-b, with PERST# released and with every NIC
+config difference undone. A sky1 boot whose NIC links never came up does
+not break it. So the bad state is most likely something this driver's
+controller init leaves in the RCSU block, which a warm reset keeps.
+
+Dump RCSU 0x300-0x5ff (strap and status words), once per RCSU block, at
+probe before the driver touches it and from the syscore hook before a
+reboot. Comparing the probe dump after a firmware-trained boot with one
+after a warm reboot from this kernel shows which words survive. Read-only.
+
+---
+--- a/drivers/pci/controller/cadence/pci-sky1.c
++++ b/drivers/pci/controller/cadence/pci-sky1.c
+@@ -1316,6 +1316,8 @@ static int sky1_pcie_parse_mem(struct sky1_pcie *pcie)
+ 		return -ENXIO;
+ 	}
+ 	pcie->rcsu_base = devm_ioremap(dev, res->start, resource_size(res));
++	pcie->rcsu_phys = res->start;
++	pcie->rcsu_size = resource_size(res);
+ 	if (!pcie->rcsu_base) {
+ 		dev_err(dev, "ioremap failed for resource %pR\n", res);
+ 		ret = -ENOMEM;
+@@ -2485,11 +2487,16 @@ static int __init sky1_pcie_reboot_perst_setup(char *str)
+ }
+ __setup("sky1_pcie_reboot_perst=", sky1_pcie_reboot_perst_setup);
+ 
++static void sky1_pcie_dump_rcsu(struct sky1_pcie *pcie, const char *when);
++
+ static int _sky1_pcie_syscore_op_shutdown(struct sky1_pcie *pcie)
+ {
+ 	if (!pcie->is_probe)
+ 		return 0;
+ 
++	if (system_state == SYSTEM_RESTART)
++		sky1_pcie_dump_rcsu(pcie, "reboot");
++
+ 	if (system_state == SYSTEM_RESTART && !sky1_pcie_reboot_perst) {
+ 		sky1_pcie_disable_irq(pcie);
+ 		return 0;
+@@ -2637,6 +2644,43 @@ static int sky1_cdns_pcie_host_setup(struct cdns_pcie_rc *rc)
+ 	return sky1_pci_host_probe(bridge);
+ }
+ 
++/*
++ * Debug: dump the RCSU strap and status words (0x300-0x5ff), once per RCSU
++ * block, at probe before the driver touches them and again before a reboot.
++ * Comparing a probe after a firmware-trained boot with the dump taken before
++ * a warm reboot shows which words this driver leaves behind.
++ */
++static void sky1_pcie_dump_rcsu(struct sky1_pcie *pcie, const char *when)
++{
++	static resource_size_t seen[2][8];
++	static DEFINE_SPINLOCK(dump_lock);
++	unsigned long flags;
++	int slot = strcmp(when, "probe") ? 1 : 0;
++	resource_size_t end = min_t(resource_size_t, pcie->rcsu_size, 0x600);
++	u32 off;
++	int i;
++
++	if (!pcie->rcsu_base || end <= 0x300)
++		return;
++
++	spin_lock_irqsave(&dump_lock, flags);
++	for (i = 0; i < 8 && seen[slot][i]; i++)
++		if (seen[slot][i] == pcie->rcsu_phys)
++			goto out;
++	if (i < 8)
++		seen[slot][i] = pcie->rcsu_phys;
++
++	for (off = 0x300; off + 16 <= end; off += 16)
++		pr_info("sky1-rcsu %s %llx+%03x: %08x %08x %08x %08x\n", when,
++			(unsigned long long)pcie->rcsu_phys, off,
++			readl(pcie->rcsu_base + off),
++			readl(pcie->rcsu_base + off + 4),
++			readl(pcie->rcsu_base + off + 8),
++			readl(pcie->rcsu_base + off + 12));
++out:
++	spin_unlock_irqrestore(&dump_lock, flags);
++}
++
+ static int sky1_pcie_really_probe(void *p)
+ {
+ 	struct sky1_pcie *pcie = p;
+@@ -2645,6 +2689,7 @@ static int sky1_pcie_really_probe(void *p)
+ 	struct device *dev = pcie->dev;
+ 	int ret;
+ 
++	sky1_pcie_dump_rcsu(pcie, "probe");
+ 	sky1_pcie_clear_macro_pwr_en(pcie);
+ 	sky1_pcie_x211_enum_lock(pcie, true);
+ 	ret = sky1_pcie_reset(pcie);
+--- a/drivers/pci/controller/cadence/pci-sky1.h
++++ b/drivers/pci/controller/cadence/pci-sky1.h
+@@ -103,6 +103,8 @@ struct sky1_pcie {
+ 	struct pci_config_window *cfg;
+ 	void __iomem *rcsu_base;
+ 	void __iomem *strap_base;
++	resource_size_t rcsu_phys;	/* debug dump */
++	resource_size_t rcsu_size;
+ 	void __iomem *status_base;
+ 	void __iomem *reg_base;
+ 	void __iomem *cfg_base;
