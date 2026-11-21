@@ -53,7 +53,7 @@
   (S5 GPIO0 lines 27/28, schematic p19-20; firmware drives them as outputs, high). Switching them from
   Armbian through /dev/mem froze the board twice, so `scripts/nic-power.sh` is experimental and gated.
   Supported workaround: a local smart plug driven by `tools/plug-watch.ps1` from the serial log (tested: one
-  cycle through Home Assistant from Zeus, 2026-11-19). Needs an RTC battery (CR2032 on JRTC1): without one a
+  cycle through Home Assistant, 2026-11-19). Needs an RTC battery (CR2032 on JRTC1): without one a
   power cut resets the firmware settings (6400 -> 6000 MT/s, power-on-after-AC-loss off) and the board stays off.
 
 ## Phase 2: NPU (next)

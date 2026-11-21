@@ -1,4 +1,4 @@
-# Power-cycles aiPi through a local smart plug, by hand or automatically when the firmware fails
+# Power-cycles the board through a local smart plug, by hand or automatically when the firmware fails
 # NIC link training ("Root Port 2/3: Link Up Fail" on the debug UART, logged by bench/serial-log.ps1).
 #
 # Needs an RTC battery on the board (CR2032 on JRTC1): without it a power cut resets the firmware settings
@@ -12,19 +12,19 @@
 # switch.turn_off, waits, then switch.turn_on, retrying turn_on until HA confirms the switch is on.
 #
 # Config (kept outside the repo, so no LAN addresses, tokens or passwords get committed): a JSON file,
-# default aipi-plug.json next to serial.log:
+# default opi6-plug.json next to serial.log:
 #   { "type": "homeassistant", "url": "http://<ha address>:8123", "token": "<long-lived token>",
 #     "entity": "switch.<plug>", "offSeconds": 30 }
 #   { "type": "shelly", "host": "<plug address>", "user": "", "password": "", "offSeconds": 30 }
 #   "type": "tasmota" works like shelly.
-#   { "type": "ssh", "host": "zeus", "command": "orangepi6/tools/plug-powercycle.sh" }
+#   { "type": "ssh", "host": "<linux host>", "command": "orangepi6/tools/plug-powercycle.sh" }
 #     runs the power cycle on another machine that can reach the plug (needs non-interactive ssh).
 #
 #   pwsh -File plug-watch.ps1 -Once                 # one power cycle now
 #   pwsh -File plug-watch.ps1 [-Log <serial.log>]   # watch the serial log and cycle on link-training failure
 param(
   [string]$Log    = (Join-Path $PSScriptRoot 'serial.log'),
-  [string]$Config = (Join-Path (Split-Path $Log) 'aipi-plug.json'),
+  [string]$Config = (Join-Path (Split-Path $Log) 'opi6-plug.json'),
   [switch]$Once,
   [int]$MinGapSeconds = 180,   # never cycle more often than this
   [int]$MaxPerHour = 3         # then stop and leave it to a human
@@ -60,7 +60,7 @@ function Invoke-PowerCycle {
         if (-not $ok) { Start-Sleep -Seconds 10 }
       }
       if (-not $ok) {
-        $msg = "=== $(Get-Date -Format s) plug-watch: *** FAILED TO TURN aiPi BACK ON via $($cfg.entity); it is probably still OFF ***"
+        $msg = "=== $(Get-Date -Format s) plug-watch: *** FAILED TO TURN THE BOARD BACK ON via $($cfg.entity); it is probably still OFF ***"
         $msg | Add-Content -Path $Log -Encoding utf8; Write-Host $msg -ForegroundColor Red
         try { [console]::beep(880, 1500) } catch {}
         throw 'power not restored'
@@ -69,7 +69,7 @@ function Invoke-PowerCycle {
     'ssh' {
       & ssh -o BatchMode=yes -o ConnectTimeout=10 $cfg.host $cfg.command
       if ($LASTEXITCODE -ne 0) {
-        $msg = "=== $(Get-Date -Format s) plug-watch: *** remote power cycle on $($cfg.host) FAILED (exit $LASTEXITCODE); aiPi may be OFF ***"
+        $msg = "=== $(Get-Date -Format s) plug-watch: *** remote power cycle on $($cfg.host) FAILED (exit $LASTEXITCODE); the board may be OFF ***"
         $msg | Add-Content -Path $Log -Encoding utf8; Write-Host $msg -ForegroundColor Red
         try { [console]::beep(880, 1500) } catch {}
         throw 'remote power cycle failed'
@@ -77,7 +77,7 @@ function Invoke-PowerCycle {
     }
     default { throw "unknown plug type '$($cfg.type)'" }
   }
-  "=== $(Get-Date -Format s) plug-watch: power-cycled aiPi ($off s off, $($cfg.type))" | Add-Content -Path $Log -Encoding utf8
+  "=== $(Get-Date -Format s) plug-watch: power-cycled the board ($off s off, $($cfg.type))" | Add-Content -Path $Log -Encoding utf8
 }
 
 if ($Once) { Invoke-PowerCycle; return }

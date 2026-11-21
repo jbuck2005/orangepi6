@@ -25,6 +25,7 @@ Kernel lines:
 | Software GPIO power switch for the NICs is a dead end | [2026-11-19](#2026-11-19-nic-link-training-after-warm-reboots) |
 | Kernel 7 warm reboot hangs at the watchdog | [2026-11-19](#2026-11-19-kernel-7-track-735) |
 | Kernel 7 AER storm: an unacked LTSSM-transition bit; CPU gap is thread placement | [2026-11-21](#2026-11-21-kernel-7-aer-fix-cpu-placement-warm-reboots-into-armbian) |
+| Smart-plug workaround for lost NICs merged (needs RTC battery) | [2026-11-21](#2026-11-21-smart-plug-workaround-for-lost-nics-merged) |
 | Board draws ~17 W idle and 30-36 W under load at the wall | [2026-11-20](#2026-11-20-power-draw) |
 | Fuzzy patching misplaced an arm_scmi hunk into a NULL dereference | [2026-11-19](#2026-11-19-kernel-61864-lts) |
 
@@ -267,6 +268,24 @@ Branch `kernel-7`; details in `docs/KERNEL-7.md` there.
   recovered each. Armbian into sky1 always trained. Suspect: the sky1 PCIe syscore shutdown hook.
 - Silent hangs under build load happen on several kernels, including Armbian 6.18.45 at 6000 MT/s. Cause unknown.
 
+## 2026-11-21: smart-plug workaround for lost NICs merged
+
+The NIC power work from 2026-11-19 is now on `main`, squashed from its working branch.
+
+**Changes:**
+- `tools/plug-watch.ps1` watches the serial log on the PC and power-cycles the board through a local smart plug
+  when the firmware reports `Link Up Fail` (at most 3 times an hour; `-Once` for a manual cycle). It drives a
+  Shelly, a Tasmota plug or Home Assistant directly, or runs `tools/plug-powercycle.sh` on another host over ssh.
+- `tools/plug-powercycle.sh` does one cycle from Linux (Home Assistant `switch.turn_off`, wait, `switch.turn_on`
+  with retries and a loud failure; or Shelly/Tasmota). The HA token can sit in its own chmod 600 file, or be read
+  as one variable from an env file (parsed, not sourced).
+- Plug address, entity and token live in a config file outside the repo: `opi6-plug.json` next to the serial log
+  (PowerShell) or `~/.config/opi6-plug.json` (Linux). No addresses or tokens are committed.
+- `scripts/nic-power.sh` and `systemd/opi6-nic-recover.service` (software power cycle of the NIC rails through
+  GPIO038/039) are included but **experimental and gated**: writing the GPIO block from Armbian froze the board twice.
+- INSTALL.md and STATUS.md describe the workaround and that it needs an RTC battery: without one a power cut resets
+  the firmware settings and the board stays off after the plug comes back on.
+
 ## Open items
 
 - NPU (phase 2): the in-tree `armchina` driver already probes on the sky1 ACPI boot. Leads:
@@ -274,5 +293,5 @@ Branch `kernel-7`; details in `docs/KERNEL-7.md` there.
 - Kernel 7: CPU thread placement (~12% slower); confirm `0053` on a storming boot; CIX display drivers.
 - Warm reboots from a sky1 kernel into Armbian fail NIC link training (SysRq over serial recovers).
 - Silent hangs under build load on several kernels.
-- NIC warm-reboot link training: smart-plug workaround pending merge; a real fix would need the firmware.
+- NIC warm-reboot link training: smart-plug workaround on `main` (needs the RTC battery); a real fix would need the firmware.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.

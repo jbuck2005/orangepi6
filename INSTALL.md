@@ -84,7 +84,7 @@ scripts/gpu-test.sh           # optional: vulkaninfo, glmark2, vkmark
 - **Network ports missing after a reboot:** the firmware sometimes fails PCIe link training for the RTL8125s on a
   warm reboot (`ip -br link` shows only `lo`; the serial console shows `Root Port 2/3: Link Up Fail,Ltssm State:40C80`).
   It happens on both the V0.8 and the 2026-10-19 firmware, and only after a session that used the NICs. The fix is
-  cutting the power for about 30 s. To automate it, put aiPi on a smart plug with a local HTTP API (Shelly Gen2+/Gen3
+  cutting the power for about 30 s. To automate it, put the board on a smart plug with a local HTTP API (Shelly Gen2+/Gen3
   with its cloud switched off, or a Tasmota plug) and run `tools/plug-watch.ps1` on the PC that logs the serial
   console: it power-cycles the board when the firmware reports the failure (at most 3 times an hour), and
   `-Once` does a cycle by hand. `tools/plug-powercycle.sh` does a single cycle from Linux. The plug's address
