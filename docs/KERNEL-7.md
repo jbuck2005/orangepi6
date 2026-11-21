@@ -277,6 +277,14 @@ Orion O6 / Sky1 XCP boards.
   99-default.link applied. Earlier boots only looked right because the NICs still held the real
   address from Armbian. The pins now match `Path=*pci-<address>`.
 
+- 2026-11-21, 6.18.64 on a fresh boot at 6000: pp512/tg128 123.5/36.5 as booted, the same
+  with EAS off, the performance governor or pinning. The 96/25 above came from one bad boot
+  right after a warm reboot from 7.3.5. Memory bandwidth (`bw.sh`) is the same on both kernels
+  (write ~18.3 GB/s, read ~11.8-12 GB/s). So 7.3.5 as booted is about 12% slower than 6.18.64,
+  and only pinning to the big cores closes the gap: a placement change in the 7.x scheduler.
+  EAS, LLC balancing and the governor are ruled out. `cpu-diag.sh` now also samples which CPU
+  each busy benchmark thread is on.
+
 ### Warm reboot test plan
 
 Every hang needs a ~30 s power-off. Watch the serial log from Prometheus.

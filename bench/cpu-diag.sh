@@ -70,6 +70,8 @@ run() {
   echo "== variant $name"
   ( while sleep 5; do
       printf 'freq:'; for p in /sys/devices/system/cpu/cpufreq/policy*; do printf ' %s=%s' "${p##*/}" "$(cat $p/scaling_cur_freq)"; done; echo
+      # Where the benchmark's busy threads are right now: "count x cpuN" for threads using CPU.
+      pid=$(pgrep -n llama-bench) && echo "cpus: $(ps -L -o psr=,pcpu= -p "$pid" | awk '$2 > 20 {print "cpu" $1}' | sort | uniq -c | awk '{printf "%sx%s ", $1, $2}')"
     done ) & local mon=$!
   "$@" timeout 900 "$BENCH" -m "$M" -dev none -ngl 0 -t 8 -p 512 -n 128 -r 2 2>&1 | grep -E '^\| qwen|error'
   kill $mon 2>/dev/null; wait $mon 2>/dev/null
