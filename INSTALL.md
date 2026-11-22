@@ -97,6 +97,11 @@ scripts/gpu-test.sh           # optional: vulkaninfo, glmark2, vkmark
   without one, every power cut resets the firmware settings, so memory drops back to its default speed and the
   "power on after AC loss" setting turns off, and the board then stays off after the plug comes back on. (`scripts/nic-power.sh`, which switches the NIC rails
   through GPIO038/039, is experimental: it froze the board under Armbian.)
+- **Cool the NVMe SSD.** On a bare board the M.2 slot gets no airflow. Under heavy disk load (a full kernel build)
+  the controller of a heatsink-less SSD reached 97-100 C on our board, and we saw a hang and a kernel panic during
+  such builds. With a small fan blowing across the SSD it stayed around 50 C and an 8-hour build-and-memory-stress
+  run passed. `nvme smart-log /dev/nvme0` shows the sensors; the composite value can look fine while "Sensor 1"
+  (the controller) is far hotter. Fit an M.2 heatsink or give the SSD some airflow.
 - **LLMs on the GPU:** llama.cpp's Vulkan backend on panvk generates text at only ~1.7 tok/s, and prompt processing
   fails with `ErrorOutOfDeviceMemory`. Use the CPU for now: Qwen2.5-1.5B Q4 runs at ~124 tok/s for prompts and ~37 tok/s
   for generation, and 7B at ~34/9 tok/s. In a Vulkan build, pass `-dev none`.

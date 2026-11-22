@@ -27,6 +27,7 @@ Kernel lines:
 | Kernel 7 AER storm: an unacked LTSSM-transition bit; CPU gap is thread placement | [2026-11-21](#2026-11-21-kernel-7-aer-fix-cpu-placement-warm-reboots-into-armbian) |
 | Smart-plug workaround for lost NICs merged (needs RTC battery) | [2026-11-21](#2026-11-21-smart-plug-workaround-for-lost-nics-merged) |
 | Board draws ~17 W idle and 30-36 W under load at the wall | [2026-11-20](#2026-11-20-power-draw) |
+| Build-load crashes at 6000 MT/s track NVMe controller heat; an 8 h full-build run passes with a fan on the SSD | [2026-11-21](#2026-11-21-stability-at-6000-mts-nvme-heat) |
 | Fuzzy patching misplaced an arm_scmi hunk into a NULL dereference | [2026-11-19](#2026-11-19-kernel-61864-lts) |
 
 ---
@@ -339,11 +340,40 @@ The NIC power work from 2026-11-19 is now on `main`, squashed from its working b
 - The debug and r8125-only experiments `post/0006`-`0010` are dropped (`0009` already was). `post/0005` stays: it
   was in the tested build and only keeps PERST# released on a reboot.
 
+## 2026-11-21: stability at 6000 MT/s; NVMe heat
+
+Firmware v1.0_for_opi6_linux (2026-10-19), memory at 6000 MT/s unless noted. The test SSD is a Kingston NV3
+(SNV3S1000G, DRAM-less, no heatsink) in the M.2 slot, which gets no airflow on a bare board.
+
+- Two failures at 6000 under build load, both during a **full from-scratch build** (fresh `linux-sky1` clone,
+  kernel tarball unpack, ~150 patches, then `-j6`), which is the heaviest NVMe I/O we run:
+  - 2026-11-20: Armbian's own 6.18.45 hung silently about 25 minutes into such a build (wall power flat at ~23 W,
+    no network, no serial output).
+  - 2026-11-21: sky1 6.18.64 panicked about 2 minutes into one: `Unable to handle kernel paging request` in
+    `percpu_ref_get_many` <- `charge_memcg` <- a page fault in `cc1`, i.e. a corrupt pointer. The firmware reported
+    no DDR ECC error.
+- The NVMe's controller sensor ("Sensor 1" in `nvme smart-log`) reached **97-100 C** during builds, and about 83 C
+  idle. The composite temperature stayed around 60 C (warning 75 C, critical 80 C), and the drive logged no
+  thermal throttling, so the drive itself never flagged it. Tilting the board for convection made no difference.
+- 5500 MT/s, no SSD cooling: the full build plus 30 minutes of `stress-ng --vm 6 --vm-bytes 60% --verify --cpu 6`
+  passed.
+- 6000 MT/s, no SSD cooling, `bench/stability.sh` (clean rebuilds of an unpacked tree, i.e. light I/O, alternating
+  with 10-minute verified `stress-ng` rounds), Armbian's kernel: **4 hours, 7 of 7 cycles passed**.
+- 6000 MT/s with a small blower fan on the SSD, `bench/stability.sh FULL=1` (the full from-scratch build pattern
+  that had failed, alternating with verified `stress-ng`), Armbian's kernel: **8.4 hours, 15 of 15 builds and 14 of
+  14 stress rounds passed**, no panic, oops or DDR ECC line on the serial console. The controller sensor peaked at
+  52-63 C depending on fan speed (averages 48-52 C), the composite at 44 C, the board at 44 C.
+- Conclusion: the failures line up with an overheating NVMe controller under heavy I/O, not with the memory rate.
+  Not proven (that needs the same full-build run without the fan), but 6000 MT/s is stable here once the SSD is
+  cooled. INSTALL.md now recommends a heatsink or airflow on the SSD.
+- `bench/stability.sh`: the multi-hour run. It logs every step to `~/stability.log` and to the kernel log, so the
+  record survives on a serial capture if the board dies.
+
 ## Open items
 
 - NPU (phase 2): the in-tree `armchina` driver already probes on the sky1 ACPI boot. Leads:
   visorcraft/orange-pi-6-plus-npu, Sky1-Linux/sky1-drivers-dkms.
 - Kernel 7: CPU thread placement (~12% slower); confirm `0053` on a storming boot; CIX display drivers.
-- Silent hangs under build load on several kernels.
+- Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
 - Kernel 7 (`kernel-7` branch): boot-test its `r8169` build.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.
