@@ -485,6 +485,14 @@ Change:
   SCMI genpd's private struct; under ACPI the `perf` domain attached by index). `v3_1` is replaced by `v3_2`
   upstream. Compile-tested by cross-building the module against both patched trees (no errors; every undefined
   symbol is exported). Not yet booted.
+- `scripts/npu-umd.sh`: builds Arm China's `libaipudrv` 4.1.0 (pinned commit `f35bac0`) natively and optionally
+  installs it to `/usr/local`. `-Werror` is dropped from its Makefile (newer g++ warns about hidden overloads).
+  Cross-built cleanly in the cloud.
+- `tools/npu-run.cpp`: `info` (driver versions, partitions, cores), `bench` (load a `.cix` or ELF graph, time N runs)
+  and `classify` (one float32 input, quantized with the graph's scale and zero point, top 5).
+- `bench/npu-bringup.sh`: test on a running sky1 kernel without a reboot: patch the driver into the existing build
+  tree, build and swap only the module, build the library and `npu-run`, fetch MobileNetV2 and YOLOv8n from the
+  model hub and benchmark them.
 
 ## Open items
 
