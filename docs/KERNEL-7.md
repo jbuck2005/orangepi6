@@ -325,6 +325,16 @@ Orion O6 / Sky1 XCP boards.
   phase has short bursts with many sleeps and wakeups between matrix ops, so wake placement
   (`select_idle_sibling` / `select_idle_capacity`, `asym_fits_cpu`) is the next suspect. That
   code is next to diff against 6.18. Workaround until then: `taskset -c 0,1,6-11`.
+- 2026-11-22, likely cause found in the wakeup path: 7.x added the SIS_UTIL `nr_idle_scan` cut to
+  `select_idle_capacity()`, the scan that picks an idle CPU for a waking task on an
+  asymmetric-capacity system. With 8 of 12 CPUs busy the hint is about 6, so the scan stops after
+  six CPUs counted from the wakeup target. The benchmark threads' util (~900) fits no CPU within
+  the 80% capacity margin, so the scan keeps the highest-capacity idle CPU it has seen; from
+  cpu0/1 the next CPUs are the little cpu2-5, and idle cpu6-11 are never looked at. 6.18 scanned
+  the whole domain. The threads wake often in prompt processing and rarely in token generation,
+  which fits the tg-only probe showing no little-core placement. Runtime test with no build:
+  `bench/sched-ab.sh base no-sis-util` (turns SIS_UTIL off through debugfs). Fix: `0055` scans
+  the whole domain again.
 - 2026-11-21, warm reboots: every warm reboot from a sky1 kernel (6.18.64 or 7.3.5) into Armbian
   that night failed NIC link training (Root Port 2/3, LTSSM 0x40C80), and SysRq over serial
   recovered all 9. Reboots from Armbian into a sky1 kernel always trained. So the sky1 kernels

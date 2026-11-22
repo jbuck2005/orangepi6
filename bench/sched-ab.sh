@@ -7,6 +7,10 @@
 #   no-ni-rate    - NO_NI_RATE: newidle balancing not throttled by its time-based rate (new in 7.x)
 #   no-ni-random  - NO_NI_RANDOM: newidle balancing not skipped at random by its success ratio
 #   no-ni-both    - both of the above
+#   no-sis-util   - NO_SIS_UTIL: wakeup idle-CPU scans are not cut short by LLC utilization. On 7.x this
+#                   cut also applies to select_idle_capacity(), which can then stop before it reaches
+#                   an idle big core and pick an idle little one.
+# Pass variant names to run only those, e.g. sched-ab.sh base no-sis-util
 set -uo pipefail
 cd ~/bench || exit 1
 LOG=~/bench/sched-ab-$(uname -r).log
@@ -21,7 +25,7 @@ ORIG=$(sudo cat "$F")
 has() { grep -qw "$1" <<<"$ORIG" || grep -qw "NO_$1" <<<"$ORIG"; }
 set_feat() { echo "$1" | sudo tee "$F" >/dev/null; }
 restore() {  # put back NI_* exactly as booted
-  for f in NI_RATE NI_RANDOM; do
+  for f in NI_RATE NI_RANDOM SIS_UTIL; do
     if grep -qw "NO_$f" <<<"$ORIG"; then set_feat "NO_$f"; elif grep -qw "$f" <<<"$ORIG"; then set_feat "$f"; fi
   done
 }
@@ -32,7 +36,7 @@ echo "== features: $ORIG"
 
 run() {
   local name=$1
-  echo "== variant $name: $(sudo cat "$F" | tr ' ' '\n' | grep -E '^(NO_)?NI_' | paste -sd' ')"
+  echo "== variant $name: $(sudo cat "$F" | tr ' ' '\n' | grep -E '^(NO_)?(NI_|SIS_UTIL)' | paste -sd' ')"
   ( while sleep 5; do
       pid=$(pgrep -n llama-bench) && echo "cpus: $(ps -L -o psr=,pcpu= -p "$pid" | awk '$2 > 20 {print "cpu" $1}' | sort | uniq -c | awk '{printf "%sx%s ", $1, $2}')"
     done ) & local mon=$!
@@ -40,8 +44,11 @@ run() {
   kill $mon 2>/dev/null; wait $mon 2>/dev/null
 }
 
-run base
-if has NI_RATE; then set_feat NO_NI_RATE; run no-ni-rate; restore; fi
-if has NI_RANDOM; then set_feat NO_NI_RANDOM; run no-ni-random; restore; fi
-if has NI_RATE && has NI_RANDOM; then set_feat NO_NI_RATE; set_feat NO_NI_RANDOM; run no-ni-both; restore; fi
+want() { [ -z "$WANT" ] || [[ " $WANT " == *" $1 "* ]]; }
+WANT="$*"
+want base && run base
+if want no-ni-rate && has NI_RATE; then set_feat NO_NI_RATE; run no-ni-rate; restore; fi
+if want no-ni-random && has NI_RANDOM; then set_feat NO_NI_RANDOM; run no-ni-random; restore; fi
+if want no-ni-both && has NI_RATE && has NI_RANDOM; then set_feat NO_NI_RATE; set_feat NO_NI_RANDOM; run no-ni-both; restore; fi
+if want no-sis-util && has SIS_UTIL; then set_feat NO_SIS_UTIL; run no-sis-util; restore; fi
 echo "== $(date -Is) done"
