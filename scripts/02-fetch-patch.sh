@@ -1,5 +1,5 @@
 #!/bin/bash
-# Fetch kernel.org $KV (kernel.conf), verify Greg K-H's signature, apply Sky1-Linux LTS patches,
+# Fetch kernel.org $KV (kernel.conf), verify Greg K-H's signature, apply the Sky1 patches for this track,
 # add the Orange Pi 6 (non-Plus) device tree, and configure.
 set -euo pipefail
 REPO=$(cd "$(dirname "$0")/.." && pwd)
@@ -38,6 +38,9 @@ case ${NIC_DRIVER:-r8169} in
   r8169) ./scripts/config --disable R8125 --enable R8169 --enable REALTEK_PHY ;;
   *) echo "NIC_DRIVER must be r8125 or r8169"; exit 1 ;;
 esac
+# per-track config changes from kernel.conf (word splitting intended)
+# shellcheck disable=SC2086
+[ -z "${KCONFIG_EXTRA:-}" ] || ./scripts/config $KCONFIG_EXTRA
 make HOSTCC="$HOSTCC" CC="$CC" olddefconfig >/dev/null
 KREL=$(make -s kernelrelease)
 [ "$KREL" = "$KV-sky1" ] || { echo "unexpected kernel release $KREL (is $WORK inside a git repo?)"; exit 1; }

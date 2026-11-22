@@ -1,0 +1,67 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: orangepi6 kernel-7 port
+Subject: [PATCH] sched fair scan the whole asym capacity domain on wakeup
+
+On 7.3.5 one to four of eight busy llama.cpp threads sit on the little
+cores (capacity 279) while big cores idle, costing ~12% against 6.18.
+The threads wake often during prompt processing. On wakeup
+select_idle_sibling() calls select_idle_capacity() over the
+asymmetric-capacity domain (all 12 CPUs here). 7.x added the SIS_UTIL
+nr_idle_scan limit to that scan. With 8 of 12 CPUs busy the hint is about
+6, so the scan stops after six CPUs from the wakeup target. The threads'
+util (~900) fits no CPU within the capacity margin, so the scan keeps the
+highest-capacity idle CPU it saw, and from cpu0/1 that is a little core
+(cpu2-5) while idle cpu6-11 are never looked at. 6.18 scanned the whole
+domain. Do that again.
+---
+ kernel/sched/fair.c | 26 +++++++-------------------
+ 1 file changed, 7 insertions(+), 19 deletions(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 913630c0b..055b09e8a 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -9049,7 +9049,6 @@ select_idle_capacity(struct task_struct *p, struct sched_domain *sd, int target)
+ 	int fits, best_fits = ASYM_IDLE_THREAD_MISFIT;
+ 	int cpu, best_cpu = -1;
+ 	struct cpumask *cpus;
+-	int nr = INT_MAX;
+ 
+ 	cpus = this_cpu_cpumask_var_ptr(select_rq_mask);
+ 	cpumask_and(cpus, sched_domain_span(sd), p->cpus_ptr);
+@@ -9058,28 +9057,17 @@ select_idle_capacity(struct task_struct *p, struct sched_domain *sd, int target)
+ 	util_min = uclamp_eff_value(p, UCLAMP_MIN);
+ 	util_max = uclamp_eff_value(p, UCLAMP_MAX);
+ 
+-	if (sched_feat(SIS_UTIL) && sd->shared) {
+-		/*
+-		 * Same nr_idle_scan hint as select_idle_cpu(), nr only limits
+-		 * the scan when not preferring an idle core.
+-		 */
+-		nr = READ_ONCE(sd->shared->nr_idle_scan) + 1;
+-		/* overloaded domain is unlikely to have idle cpu/core */
+-		if (nr == 1)
+-			return -1;
+-	}
+-
++	/*
++	 * Scan the whole domain, as 6.18 did. Do not cut the scan short with
++	 * the SIS_UTIL nr_idle_scan hint: on a busy system the hint drops to a
++	 * few CPUs, the scan then stops at whatever idle CPU it met first, and
++	 * a task that fits no CPU (util above every capacity margin) lands on
++	 * an idle little core while an idle big core is never looked at.
++	 */
+ 	for_each_cpu_wrap(cpu, cpus, target) {
+ 		bool preferred_core = !has_idle_core || is_core_idle(cpu);
+ 		unsigned long cpu_cap = capacity_of(cpu);
+ 
+-		/*
+-		 * Stop when the nr_idle_scan is exhausted (mirrors
+-		 * select_idle_cpu() logic).
+-		 */
+-		if (!has_idle_core && --nr <= 0)
+-			return best_cpu;
+-
+ 		if (!choose_idle_cpu(cpu, p))
+ 			continue;
+ 

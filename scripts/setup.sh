@@ -6,7 +6,7 @@
 # Steps (each one is checked; the script stops with a clear message on the first failure):
 #   1. preflight   board, firmware, OS, disk space, network
 #   2. packages    build dependencies and Mesa/Vulkan userspace from the Ubuntu archive (apt)
-#   3. source      kernel.org $KV from kernel.conf (signature checked) + Sky1-Linux patches + this repo's DTS
+#   3. source      kernel.org $KV from kernel.conf (signature checked) + Sky1 patches + this repo's DTS
 #   4. build       Image, modules, DTBs (-j6, 20-60 min)
 #   5. stage       /boot/sky1/*, modules, initramfs, NIC MAC pins; then install.sh verify
 #   6. default     "Sky1 (acpi)" becomes the GRUB default; Armbian stays entry 0 and the
@@ -17,13 +17,17 @@
 #                                 checks its SHA-256 against the release's SHA256SUMS, then steps 5-6.
 #
 # Re-running is safe: finished steps are skipped (state in $WORK/.setup-*). `setup.sh <step>` runs one step.
+#
+# Kernel track (kernel.conf): 6.18.64 LTS by default. `KERNEL_TRACK=7 scripts/setup.sh [--prebuilt]` installs
+# 7.3.5 instead. To switch an installed board between tracks, boot Armbian's kernel and run
+# `FORCE=1 KERNEL_TRACK=<track> scripts/setup.sh [--prebuilt]`.
 set -euo pipefail
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 WORK=${WORK:-$HOME/sky1-build}
 export WORK
 # shellcheck disable=SC1091
 . "$REPO/kernel.conf"
-RELEASE_TAG=${RELEASE_TAG:-v2026.11.19.1}
+RELEASE_TAG=${RELEASE_TAG:-$RELEASE_TAG_DEFAULT}
 RELEASE_URL=${RELEASE_URL:-https://github.com/jbuck2005/orangepi6/releases/download/$RELEASE_TAG}
 STEPS="preflight packages source build stage default"
 if [ "${1:-}" = --prebuilt ]; then PREBUILT=1; shift; set -- "${1:-all}"; fi
@@ -34,8 +38,10 @@ say()  { printf '\n== %s\n' "$*"; }
 ok()   { echo "  ok: $*"; }
 warn() { echo "  WARNING: $*"; }
 die()  { echo "  FAIL: $*" >&2; exit 1; }
-done_mark() { touch "$WORK/.setup-$1"; }
-is_done()   { [ -f "$WORK/.setup-$1" ]; }
+# The 6.18 track keeps the original marker names; other tracks add their kernel version.
+MARK=$WORK/.setup; [ "$KERNEL_TRACK" = 6.18 ] || MARK=$WORK/.setup-$KV
+done_mark() { touch "$MARK-$1"; }
+is_done()   { [ -f "$MARK-$1" ]; }
 
 preflight() {
   say "preflight"
@@ -113,13 +119,14 @@ stage() {
   # stage reads the NICs' real MAC addresses through Armbian's r8169 driver (sky1 can't, see install.sh)
   [ "$(uname -r)" != "$KV-sky1" ] || die "running $KV-sky1: boot Armbian's kernel for this step
          (sudo grub-reboot \"\$(grep -m1 -oP \"menuentry '\\KArmbian[^']*\" /boot/grub/grub.cfg)\" && sudo reboot)"
-  sudo WORK="$WORK" bash "$REPO/scripts/install.sh" stage
+  sudo WORK="$WORK" KERNEL_TRACK="$KERNEL_TRACK" bash "$REPO/scripts/install.sh" stage
+  echo "$KERNEL_TRACK" > "$WORK/.kernel-track"
   sync
 }
 
 default_() {
   say "make sky1 the default boot"
-  sudo WORK="$WORK" bash "$REPO/scripts/install.sh" default
+  sudo WORK="$WORK" KERNEL_TRACK="$KERNEL_TRACK" bash "$REPO/scripts/install.sh" default
   echo
   echo "Done. Reboot now:  sudo reboot"
   echo "Afterwards:        $REPO/scripts/setup.sh check"
@@ -141,7 +148,7 @@ check() {
   [ -n "$(ip -4 route show default)" ] || warn "no default route (see INSTALL.md: NIC link training quirk)"
   # only now is the new kernel known good: drop module trees of older sky1 releases
   if [ "$(sudo grub-editenv list | sed -n 's/^sky1_pending=//p')" = 0 ]; then
-    sudo bash "$REPO/scripts/install.sh" prune
+    sudo WORK="$WORK" KERNEL_TRACK="$KERNEL_TRACK" bash "$REPO/scripts/install.sh" prune
   else
     warn "keeping older sky1 modules until the boot is confirmed (re-run check later)"
   fi

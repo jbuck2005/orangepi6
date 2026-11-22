@@ -29,7 +29,7 @@ cp -p "$SRC/arch/arm64/boot/dts/cix/sky1-orangepi-6.dtb" "$STAGE/arch/arm64/boot
 cp -p "$SRC/arch/arm64/boot/Image" "$STAGE/arch/arm64/boot/Image"   # last, so it stays newer than .config
 cat > "$STAGE/BUILDINFO" <<EOF
 kernel: $KREL (kernel.org $KV, signature verified at fetch time)
-patches: Sky1-Linux/linux-sky1 $(git -C "$WORK/linux-sky1" rev-parse --short HEAD) ($SKY1_PATCHES/, config/$SKY1_CONFIG)${SKY1_REFRESHED:+, refreshed for $KV: $SKY1_REFRESHED/ in this repo}
+patches: ${LOCAL_PATCHES:+jbuck2005/orangepi6 $LOCAL_PATCHES/ (port of }Sky1-Linux/linux-sky1 $(git -C "$WORK/linux-sky1" rev-parse --short HEAD) ($SKY1_PATCHES/${LOCAL_PATCHES:+)}, config/$SKY1_CONFIG)${SKY1_REFRESHED:+, refreshed for $KV: $SKY1_REFRESHED/ in this repo}${KCONFIG_EXTRA:+, config changes: $KCONFIG_EXTRA}
 dts/scripts: jbuck2005/orangepi6 $(git -C "$REPO" rev-parse --short HEAD)
 compiler: $(${CC%% *} --version | head -1)
 built: $(date -Is) on $(uname -r)

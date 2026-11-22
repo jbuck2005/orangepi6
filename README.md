@@ -7,11 +7,15 @@ Mali-G720, 2x RTL8125), on stock Armbian with a mainline-based kernel and fully 
 - **Kernel:** Linux **6.18.64** (6.18 LTS) from kernel.org plus the
   [Sky1-Linux/linux-sky1](https://github.com/Sky1-Linux/linux-sky1) patches (commit `57e018a`; the 5 that needed
   rebasing for 6.18.64, and 4 fixes of our own, are in [patches/6.18.64/](patches/6.18.64/)). It boots in the
-  firmware's **ACPI** mode. The version is set in [kernel.conf](kernel.conf).
+  firmware's **ACPI** mode. The version is set in [kernel.conf](kernel.conf). This is the default.
+- **Kernel 7 (optional):** Linux **7.3.5** from kernel.org with this repo's forward port of the Sky1 patches
+  ([patches/7.3/](patches/7.3/), [docs/KERNEL-7.md](docs/KERNEL-7.md)). Install it with `KERNEL_TRACK=7`. It matches
+  6.18.64 on the GPU and on the CPU, but it has had far less testing; see [Known issues](#known-issues).
 - **GPU:** mainline **panthor**, with Mesa from Ubuntu 26.04: **panvk** (Vulkan 1.4) and **Panfrost** (GLES 3.1).
   No CIX vendor kernel and no closed Mali (`mali_kbase` / `libmali`) stack.
 - **Safe by default:** Armbian's own kernel stays installed as GRUB entry 0 and as an automatic fallback.
-- **Current release:** [v2026.11.19.1](../../releases/tag/v2026.11.19.1) (6.18.64 LTS, prebuilt kernel + exact source).
+- **Releases:** [v2026.11.19.1](../../releases/tag/v2026.11.19.1) (6.18.64 LTS, the default) and
+  [v2026.11.22](../../releases/tag/v2026.11.22) (7.3.5, pre-release). Each has a prebuilt kernel and its exact source.
 
 This repo is for the **standard Orange Pi 6 only**. Don't use the Plus device tree (`sky1-orangepi-6-plus.dtb`) on it.
 
@@ -33,6 +37,11 @@ The full guide, with every firmware step, is [INSTALL.md](INSTALL.md). In short:
 Hands-on time is about 15 minutes. `--prebuilt` downloads the release kernel and checks it against the release's
 `SHA256SUMS`; the source path fetches kernel.org 6.18.64, checks its signature, patches it strictly (no fuzz) and
 builds it on the board. Either way the kernel goes into `/boot/sky1/` and every step is verified (`install.sh verify`).
+
+For kernel 7.3.5 instead, put `KERNEL_TRACK=7` in front of the setup command:
+`KERNEL_TRACK=7 scripts/setup.sh --prebuilt` (or without `--prebuilt` to build it). The choice is remembered, so
+`scripts/setup.sh check` needs no prefix. To switch an installed board between 6.18 and 7, boot Armbian's kernel and
+run `FORCE=1 KERNEL_TRACK=<6.18|7> scripts/setup.sh --prebuilt`. Only one sky1 kernel is installed at a time.
 
 ## Firmware and BIOS
 Firmware setup opens with **Esc** (or **F2**) at power-on. Check the installed version there or from Linux with
@@ -91,10 +100,14 @@ Details: [bench/MEMORY-AB-REPORT.md](bench/MEMORY-AB-REPORT.md) and [STATUS.md](
 - **LLMs on the GPU:** llama.cpp on panvk is slow (~1.7 tok/s) and prompt processing fails with
   `ErrorOutOfDeviceMemory`. Use the CPU (`-dev none` in a Vulkan build).
 - **panvk** is not yet a conformant Vulkan driver, and the GPU temperature sensors don't read.
-- **Kernel 7 (7.3.5) is experimental and not shipped:** it boots with the GPU working. Its CPU throughput gap (work
-  landed on the little cores, 12-20% slower) is fixed by `0055` on the `kernel-7` branch; see
-  [docs/kernel7-cpu-scheduling.md](docs/kernel7-cpu-scheduling.md). The early warm-reboot hang after "watchdog did
-  not stop" has not come back since 2026-11-20. Use 6.18.64 for now.
+- **Kernel 7 (7.3.5) is optional and less tested than 6.18.64.** GPU and CPU performance match 6.18.64 (the CPU
+  scheduling gap is fixed by `0055`, see [docs/kernel7-cpu-scheduling.md](docs/kernel7-cpu-scheduling.md)), but:
+  - the final build has been booted once; earlier builds of the same track passed a 1 h load test;
+  - the fix for the PCIe AER interrupt storm on 7.x (`0053`) has been quiet on every boot since, but no boot has yet
+    shown the storm it was written for;
+  - the CIX display drivers do not build on 7.x and are off (the board runs headless; the GPU is unaffected);
+  - two debug patches (`0050`, `0051`) are still in the series: they add a few log lines on each reboot and a
+    register dump if an AER line is ever cut off.
 
 ## Debug serial console
 The **2x2 "DEBUG" header** just below the left network jack is UART2: 3.3 V, **115200 8N1**. The row nearest the
@@ -105,6 +118,7 @@ boots (`SERIAL=1 scripts/install.sh arm acpi`) use `earlycon=pl011,mmio32,0x040d
 
 ## Roadmap
 - **Phase 1, GPU:** done (2026-11-18), released as v2026.11.19 and v2026.11.19.1.
+- **Kernel 7:** 7.3.5 merged as an optional track on 2026-11-22 and released as v2026.11.22 (pre-release).
 - **Phase 2, NPU:** next. The in-tree `armchina` driver already probes on the sky1 ACPI boot. Leads:
   [visorcraft/orange-pi-6-plus-npu](https://github.com/visorcraft/orange-pi-6-plus-npu),
   [Sky1-Linux/sky1-drivers-dkms](https://github.com/Sky1-Linux/sky1-drivers-dkms).
@@ -124,8 +138,10 @@ change (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 | `scripts/boot-report.sh` | confirms the default boot (clears GRUB's fallback mark); network fallback for test boots |
 | `scripts/gpu-test.sh` | vulkaninfo, glmark2 and vkmark, results to `/var/log/sky1-gpu-test.txt` |
 | `scripts/package-release.sh` | builds the release tarballs and `SHA256SUMS` |
-| `kernel.conf` | kernel version and Sky1 patch track used by every script |
+| `kernel.conf` | the two kernel tracks (`KERNEL_TRACK=6.18`, the default, or `7`): version and patch set used by every script |
 | `patches/6.18.64/` | rebased Sky1 patches; `post/` holds our fixes (syscore API, r8125 netpoll, AER storm) |
+| `patches/7.3/` | kernel 7 track: the Sky1 patches forward-ported to 7.3.5, plus our fixes (`0044`-`0055`) |
+| `docs/` | kernel 7 notes and board results (`KERNEL-7.md`), the CPU scheduling fix, r8125 vs r8169 |
 | `initramfs/`, `scripts/bootlog-area.sh` | early-boot logger: writes the kernel log to a raw disk area before root is mounted |
 | `dts/sky1-orangepi-6.dts` | non-Plus device tree (for the optional DT/`acpi=off` route) |
 | `bench/` | benchmark and memory-soak suite, Windows UART logger, A/B report |

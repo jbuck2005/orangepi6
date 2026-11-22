@@ -9,8 +9,8 @@ Kernel lines:
 | Line | Kernel | Where | State |
 |---|---|---|---|
 | 6.18.14 | kernel.org 6.18.14 + Sky1 patches (139) | `main` until PR #1 | released as **v2026.11.19**, superseded |
-| 6.18 LTS | kernel.org 6.18.64 + Sky1 patches, 5 rebased, 4 post patches | `main` (PR #1) | released as **v2026.11.19.1** (current) |
-| Kernel 7 | kernel.org 7.3.5 + our forward port of Sky1 patches-next (54 patches) | branch `kernel-7` | **experimental**, not released |
+| 6.18 LTS | kernel.org 6.18.64 + Sky1 patches, 5 rebased, 4 post patches | `main`, `KERNEL_TRACK=6.18` (default) | released as **v2026.11.19.1** (current default) |
+| Kernel 7 | kernel.org 7.3.5 + our forward port of Sky1 patches-next (55 patches) | `main`, `KERNEL_TRACK=7` (merged 2026-11-22; developed on branch `kernel-7`) | released as **v2026.11.22** (pre-release, optional) |
 
 ## Quick index of findings
 
@@ -26,6 +26,7 @@ Kernel lines:
 | Kernel 7 warm reboot hangs at the watchdog | [2026-11-19](#2026-11-19-kernel-7-track-735) |
 | Kernel 7 AER storm: an unacked LTSSM-transition bit; CPU gap is thread placement | [2026-11-21](#2026-11-21-kernel-7-aer-fix-cpu-placement-warm-reboots-into-armbian) |
 | Kernel 7 CPU gap: wakeup scan cut short by SIS_UTIL; fixed by `0055` | [2026-11-22](#2026-11-22-kernel-7-cpu-gap-fixed) |
+| Kernel 7.3.5 merged as an optional track; v2026.11.22 pre-release | [2026-11-22](#2026-11-22-kernel-7-merged-into-main-as-an-optional-track-release-v20261122) |
 | Smart-plug workaround for lost NICs merged (needs RTC battery) | [2026-11-21](#2026-11-21-smart-plug-workaround-for-lost-nics-merged) |
 | Board draws ~17 W idle and 30-36 W under load at the wall | [2026-11-20](#2026-11-20-power-draw) |
 | Build-load crashes at 6000 MT/s track NVMe controller heat; an 8 h full-build run passes with a fan on the SSD | [2026-11-21](#2026-11-21-stability-at-6000-mts-nvme-heat) |
@@ -417,10 +418,51 @@ As booted now matches pinned and is within about 2% of 6.18.64, so `taskset -c 0
 busy at the moment of a wakeup. The same build was the first 7.3.5 boot on the mainline `r8169` driver, and both NICs
 came up with their real MAC addresses.
 
+## 2026-11-22: kernel 7 merged into main as an optional track; release v2026.11.22
+
+The kernel 7 work (branch `kernel-7`) is merged into `main`. `main` now carries **two kernel tracks**, chosen with
+`KERNEL_TRACK` (see `kernel.conf`):
+
+| Track | Kernel | Patches | Default `--prebuilt` release |
+|---|---|---|---|
+| `6.18` (default) | kernel.org 6.18.64 LTS | Sky1-Linux `patches/` + `patches/6.18.64/` | v2026.11.19.1 |
+| `7` | kernel.org 7.3.5 | this repo's `patches/7.3/` (55 patches) | v2026.11.22 |
+
+**Why 6.18.64 stays the default:** it has days of board time, 1 h load tests at 6000 and 6400 MT/s, and many
+boots. The final 7.3.5 build has one boot. Earlier 7.3.5 builds passed a 1 h load test at 6000 MT/s
+and a warm reboot test, and performance now matches 6.18.64. But the AER storm fix `0053` has not yet been seen on a
+boot that would have stormed, the CIX display drivers are off on 7.x, and two debug patches are still in the series.
+7.3.5 is therefore offered as an option and released as a **pre-release**, so v2026.11.19.1 stays the "Latest"
+release.
+
+Changes in the merge (the merge keeps `main`'s versions of everything both branches touched, and adds the kernel 7
+pieces on top):
+- `kernel.conf`: a `case` on `KERNEL_TRACK` sets `KV`, `SKY1_PATCHES`, `SKY1_CONFIG`, `SKY1_REFRESHED`,
+  `LOCAL_PATCHES`, `KCONFIG_EXTRA` and `RELEASE_TAG_DEFAULT`. The 6.18 values are unchanged, so existing installs build
+  and update exactly as before. Without `KERNEL_TRACK`, the track recorded by the last `setup.sh stage` in
+  `$WORK/.kernel-track` is used, so `setup.sh check` and later runs stay on the installed track. An unknown track
+  stops with an error.
+- `scripts/lib-patch.sh`: one function for both tracks: the linux-sky1 series with refreshed and post patches (6.18),
+  or this repo's `patches/7.3/` (7). Strict on both (no fuzz unless `ALLOW_FUZZ=1`).
+- `scripts/02-fetch-patch.sh`: applies the track's `KCONFIG_EXTRA` (7 turns `DRM_CIX` off).
+- `scripts/setup.sh`: release tag per track; the step markers of the 6.18 track keep their names, other tracks add
+  their kernel version (`$WORK/.setup-7.3.5-*`), so the two tracks don't skip each other's steps; `KERNEL_TRACK` is
+  passed through `sudo` to `install.sh`. Switching an installed board: boot Armbian, then
+  `FORCE=1 KERNEL_TRACK=<track> scripts/setup.sh [--prebuilt]`.
+- `scripts/install.sh`: `EXTRA_CMDLINE` for one-shot debug boots (never the default entry), from `kernel-7`.
+- `scripts/package-release.sh`: `BUILDINFO` names the local patch set and config changes for the 7 track.
+- Added from `kernel-7`: `patches/7.3/` (`0001`-`0055`), `docs/KERNEL-7.md`, `bench/thermal-log.sh`.
+- README, INSTALL and STATUS: the kernel 7 option, how to install and switch, and its known issues.
+
+**Release v2026.11.22** (pre-release): `sky1-kernel-7.3.5-sky1-v2026.11.22-arm64.tar.xz`, the matching patched source,
+and `SHA256SUMS`, packaged from the board's native build of `kernel-7` at `0abe703` (identical patches to `main`'s
+`patches/7.3/`), built natively with the board's Ubuntu gcc at `-j6` in 22 minutes (the exact compiler is in `BUILDINFO`).
+
 ## Open items
 
 - NPU (phase 2): the in-tree `armchina` driver already probes on the sky1 ACPI boot. Leads:
   visorcraft/orange-pi-6-plus-npu, Sky1-Linux/sky1-drivers-dkms.
-- Kernel 7: confirm `0053` on a storming boot; CIX display drivers.
+- Kernel 7: confirm `0053` on a storming boot; more boots and a long load run on the released build; CIX display
+  drivers; drop the debug patches `0050`/`0051`.
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.
