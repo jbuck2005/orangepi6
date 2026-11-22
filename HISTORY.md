@@ -372,19 +372,50 @@ Firmware v1.0_for_opi6_linux (2026-10-19), memory at 6000 MT/s unless noted. The
 
 ## 2026-11-22: kernel 7 CPU gap fixed
 
-Branch `kernel-7`; details in `docs/KERNEL-7.md` there.
+Branch `kernel-7`. The full write-up is [docs/kernel7-cpu-scheduling.md](docs/kernel7-cpu-scheduling.md); board logs and
+the step-by-step results are in `docs/KERNEL-7.md` on `kernel-7`.
 
-- `85cdb1d` `0055` sched/fair: scan the whole asymmetric-capacity domain on wakeup. 7.x added the SIS_UTIL
-  `nr_idle_scan` limit to `select_idle_capacity()`. With 8 of 12 CPUs busy it stops the scan after about 6 CPUs
-  counted from the wakeup target, so from cpu0/1 it picks an idle little core (cpu2-5) before it reaches the idle
-  big cores. 6.18 scanned the whole domain, and `0055` restores that. `bench/sched-ab.sh` gains a `no-sis-util`
-  variant.
+**Symptom:** llama.cpp on the CPU (Qwen2.5 1.5B Q4, 8 threads) ran 109.8/30.1 tok/s (pp512/tg128) on 7.3.5, against
+123.5/36.5 on 6.18.64. Pinned to the big cores, 7.3.5 reached 121.0/34.6. Thread sampling showed 1-4 of the 8 threads
+on the little cores (cpu2-5, capacity 279) while big cores idled. One slow thread holds up all 8 at every barrier,
+so the cost was much larger than one eighth.
 
-**Findings:**
-- Turning SIS_UTIL off at runtime on 7.3.5 confirmed the cause: 109.0/29.5 → 122.1/35.9 tok/s (pp512/tg128).
-- 7.3.5 built with `0055` (`0abe703`): as booted 121.7/35.7, pinned to the big cores 121.3/35.9. That is within
-  about 2% of 6.18.64 (123.5/36.5), so `taskset` is no longer needed. The same boot was the first 7.3.5 boot on
-  `r8169`, and it came up with the real MACs and both NICs.
+**Ruled out first** (runtime toggles in `bench/cpu-diag.sh` and `bench/sched-ab.sh`, or test builds): energy-aware
+scheduling, 7.x cache-aware balancing, the cpufreq governor, memory bandwidth and clocks, topology and capacities, the
+newidle-balance features `NI_RATE` and `NI_RANDOM`, misfit accounting, the CLS `SD_PREFER_SIBLING` flag (`0054`, kept:
+it makes the domain flags match 6.18.64, but did not change speed), and frequency invariance (`bench/util-probe.sh`:
+per-thread util and runtime equal on both kernels). Token generation alone showed no misplacement, so the problem
+was in the wakeup path, which prompt processing exercises far more.
+
+**Cause:** 7.x applies the SIS_UTIL `nr_idle_scan` hint to `select_idle_capacity()`, the scan that picks an idle CPU
+for a waking task when CPUs differ in capacity. With 8 of 12 CPUs busy the hint is about 6. The scan walks CPUs in
+number order from the wakeup target and stops after six. The threads' util (~900) fits no CPU within the 80% margin,
+so the scan returns the highest-capacity idle CPU it saw. From cpu0/1 the next CPUs are the little cpu2-5, so the
+idle big cores 6-11 are never reached. The limit reaches this scan only because the firmware's PPTT makes one MC domain
+both the last-level-cache domain and the asymmetric-capacity domain. 6.18 always scanned the whole domain.
+
+- `85cdb1d` `0055` sched/fair: scan the whole asymmetric-capacity domain on wakeup (removes the limit from
+  `select_idle_capacity()` only; `select_idle_cpu()` keeps it).
+- `bench/sched-ab.sh` gains a `no-sis-util` variant and takes variant names as arguments; `bench/util-probe.sh` gains
+  `pp` and `both` modes. These, and `bench/cpu-diag.sh`, are now also on `main`.
+- README: kernel 7 known issues updated.
+
+**Results** (6000 MT/s, NVMe fan on, pp512/tg128 tok/s):
+
+| Kernel / setting | Result |
+|---|---|
+| 6.18.64 as booted | 123.5/36.5 |
+| 7.3.5 before the fix, as booted | 109.04/29.49 (threads on cpu2-5 in 4 of 4 samples) |
+| 7.3.5 before the fix, pinned to the big cores | 121.4/34.7 |
+| 7.3.5 before the fix, SIS_UTIL off at runtime | 122.06/35.88 (1 of 3 samples, one thread on cpu5) |
+| 7.3.5 + `0055` (`0abe703`), as booted | 121.67/35.70 |
+| 7.3.5 + `0055`, pinned to the big cores | 121.33/35.87 |
+| 7.3.5 + `0055`, nollc / noeas / perf governor | 121.28/35.70, 121.37/35.65, 124.22/36.64 |
+
+As booted now matches pinned and is within about 2% of 6.18.64, so `taskset -c 0,1,6-11` is no longer needed. With
+`0055`, one thread still often shows on cpu2/3 in a sample, at no measurable cost: short visits when every big core is
+busy at the moment of a wakeup. The same build was the first 7.3.5 boot on the mainline `r8169` driver, and both NICs
+came up with their real MAC addresses.
 
 ## Open items
 
