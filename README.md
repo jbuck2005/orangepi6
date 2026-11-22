@@ -91,8 +91,10 @@ Details: [bench/MEMORY-AB-REPORT.md](bench/MEMORY-AB-REPORT.md) and [STATUS.md](
 - **LLMs on the GPU:** llama.cpp on panvk is slow (~1.7 tok/s) and prompt processing fails with
   `ErrorOutOfDeviceMemory`. Use the CPU (`-dev none` in a Vulkan build).
 - **panvk** is not yet a conformant Vulkan driver, and the GPU temperature sensors don't read.
-- **Kernel 7 (7.3.5) is experimental and not shipped:** it boots with the GPU working, but a warm reboot hangs
-  after "watchdog did not stop", and CPU throughput is 12-20% lower (work lands on the little cores). Use 6.18.64.
+- **Kernel 7 (7.3.5) is experimental and not shipped:** it boots with the GPU working. Its CPU throughput gap (work
+  landed on the little cores, 12-20% slower) is fixed by `0055` on the `kernel-7` branch; see
+  [docs/kernel7-cpu-scheduling.md](docs/kernel7-cpu-scheduling.md). The early warm-reboot hang after "watchdog did
+  not stop" has not come back since 2026-11-20. Use 6.18.64 for now.
 
 ## Debug serial console
 The **2x2 "DEBUG" header** just below the left network jack is UART2: 3.3 V, **115200 8N1**. The row nearest the
