@@ -27,3 +27,18 @@ Conclusion: on the shipped firmware the board was unstable at its default memory
 
 Scripts: ab-test.sh (suite), soak.sh + ~/bench/soak-load.sh (soak), ~/bench/bw.sh (bandwidth), serial-log.ps1 (UART logger).
 Raw results: results-*.txt, soak-*.txt, bw-*.txt.
+
+## Follow-up (2026-11-21): 6000 MT/s, long runs, and NVMe heat
+
+Later, two failures at 6000 MT/s under build load (a hang and a kernel panic with no DDR ECC report) looked like
+memory trouble again. Both happened during full from-scratch kernel builds, the heaviest NVMe I/O we run, while
+the uncooled SSD's controller sensor read 97-100 C.
+
+| Memory rate | SSD cooling | Run | Result |
+|---|---|---|---|
+| 5500 | none | full build + 30 min stress-ng verify | pass |
+| 6000 | none | `bench/stability.sh`, 4 h (clean rebuilds, light I/O) | 7/7 cycles pass |
+| 6000 | blower fan | `bench/stability.sh FULL=1`, 8.4 h (full builds, heavy I/O) | 15/15 builds, 14/14 stress rounds pass |
+
+With the fan, the SSD controller peaked at 52-63 C. So 6000 MT/s is stable once the SSD is cooled; the failures
+point at NVMe heat rather than the memory rate. Details in HISTORY.md (2026-11-21).
