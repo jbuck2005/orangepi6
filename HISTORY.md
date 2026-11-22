@@ -459,6 +459,14 @@ pieces on top):
 and `SHA256SUMS`, packaged from the board's native build of `kernel-7` at `0abe703` (identical patches to `main`'s
 `patches/7.3/`), built natively with the board's Ubuntu gcc at `-j6` in 22 minutes (the exact compiler is in `BUILDINFO`).
 
+## 2026-11-22: no host names in the repo
+
+- `bench/ab-test.sh`, `bench/soak.sh`: they reached the board through fixed host names. They now take `BOARD` (the
+  board's ssh host, default `opi6`) and an optional `JUMP` host.
+- Comments in `bench/` and the default log path of `tools/netconsole-listener.py` (now `~/opi6-netconsole/`) no
+  longer use the board's local name.
+- The GitHub repository description now says "built on device".
+
 ## 2026-11-22: NPU phase started, driver updated to CIX 6.2.0
 
 Research (no board changes):

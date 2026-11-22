@@ -1,14 +1,14 @@
 #!/bin/bash
-# A/B memory + benchmark suite for aiPi, run from Prometheus (Git Bash).
+# A/B memory + benchmark suite for the board, run from a PC (Git Bash) that logs its serial console.
 # Usage: bash ab-test.sh <label>        e.g. bash ab-test.sh oldfw-5500
-# Needs: the serial logger running (serial.log next to this script), ssh zeus -> ssh aipi.
+# Needs: the serial logger running (serial.log next to this script), ssh to the board: BOARD=<ssh host> (default opi6), optional JUMP=<jump host>.
 # Counts DDR ECC errors (from the firmware's UART messages) per phase.
 set -u
 LABEL=${1:?label}
 DIR=$(cd "$(dirname "$0")" && pwd)
 L="$DIR/serial.log"
 OUT="$DIR/results-$LABEL.txt"
-remote() { ssh zeus "ssh aipi '$1'"; }
+remote() { if [ -n "${JUMP:-}" ]; then ssh "$JUMP" "ssh ${BOARD:-opi6} '$1'"; else ssh "${BOARD:-opi6}" "$1"; fi; }
 ecc_since() { tail -n +"$1" "$L" | grep -ac 'ECC_SBE'; }
 dbe_since() { tail -n +"$1" "$L" | grep -ac 'ECC_DBE'; }
 

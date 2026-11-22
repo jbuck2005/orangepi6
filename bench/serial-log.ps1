@@ -1,4 +1,4 @@
-# Logs aiPi's debug UART (UART2, 115200 8N1) from a USB-TTL adapter to a file.
+# Logs the board's debug UART (UART2, 115200 8N1) from a USB-TTL adapter to a file.
 # Each line gets a local timestamp. Reconnects if the adapter is unplugged.
 #   pwsh -File serial-log.ps1 [-Port COM10] [-Log <path>]
 param(

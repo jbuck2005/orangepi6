@@ -2,7 +2,7 @@
 """Receive netconsole UDP packets and append them, timestamped, to a log file.
 
 Usage: netconsole-listener.py [port] [logfile]
-Defaults: port 6666, ~/aipi-netconsole/netconsole.log
+Defaults: port 6666, ~/opi6-netconsole/netconsole.log
 """
 import os
 import socket
@@ -10,7 +10,7 @@ import sys
 import time
 
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 6666
-path = os.path.expanduser(sys.argv[2] if len(sys.argv) > 2 else "~/aipi-netconsole/netconsole.log")
+path = os.path.expanduser(sys.argv[2] if len(sys.argv) > 2 else "~/opi6-netconsole/netconsole.log")
 os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
