@@ -531,10 +531,24 @@ Change:
   (with `0056`) can come with the remaining kernel 7 work (more boots, a long load run).
 - README, INSTALL, STATUS and `docs/npu.md` name the release.
 
+## 2026-11-22: kernel 7 with the NPU, first boot
+
+- A full 7.3.5 build from `main` at `6934fdf` (`KERNEL_TRACK=7`, 56 patches exact, `0055` scheduler fix and `0056`
+  NPU driver included, `CONFIG_ARMCHINA_NPU=m`, `r8169`), 22 minutes at `-j6`, staged from Armbian, one-shot boot.
+- NPU: the 6.2.0 driver loads at boot ("AIPU KMD (v6.2.0)", 3 cores, `/dev/aipu`); `npu-run info` reports
+  `X2_1204MP3`, UMD 6.0.0, KMD 6.2.0. MobileNetV2: 1.78 ms mean, 562 runs/s over 200 runs (6.18.64: 1.58 ms,
+  631/s). The three test images give the same top 5 as on 6.18.64. 0 library errors, 0 driver errors.
+- NICs: both up on `r8169` with their real MACs. The warm reboot from 6.18.64 into Armbian before staging trained
+  both ports.
+- AER: this boot hit the condition `0053` fixes, for the first time on the board. The NVMe root port logged
+  "aer_nf: LTSSM transition indication latched (ltssm status 0xff000008, axi ctrl 0x00000000), cleared" four times
+  at 5.8 s, and then nothing: no spurious-interrupt or "disabling it" lines. So `0053` acks the bit and the storm
+  never starts.
+
 ## Open items
 
-- NPU: check classification against ImageNet ground truth; more hub models; 7.3.5 release with `0056`.
-- Kernel 7: confirm `0053` on a storming boot; more boots and a long load run on the released build; CIX display
+- NPU: check classification against ImageNet ground truth; more hub models; a 7.3.5 release with `0056`.
+- Kernel 7: more boots and a long load run on the released build; CIX display
   drivers; drop the debug patches `0050`/`0051`.
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.
