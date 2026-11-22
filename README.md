@@ -14,8 +14,8 @@ Mali-G720, 2x RTL8125), on stock Armbian with a mainline-based kernel and fully 
 - **GPU:** mainline **panthor**, with Mesa from Ubuntu 26.04: **panvk** (Vulkan 1.4) and **Panfrost** (GLES 3.1).
   No CIX vendor kernel and no closed Mali (`mali_kbase` / `libmali`) stack.
 - **Safe by default:** Armbian's own kernel stays installed as GRUB entry 0 and as an automatic fallback.
-- **Releases:** [v2026.11.19.1](../../releases/tag/v2026.11.19.1) (6.18.64 LTS, the default) and
-  [v2026.11.22](../../releases/tag/v2026.11.22) (7.3.5, pre-release). Each has a prebuilt kernel and its exact source.
+- **Releases:** [v2026.11.22.1](../../releases/tag/v2026.11.22.1) (6.18.64 LTS with the NPU driver, the default) and
+  [v2026.11.22](../../releases/tag/v2026.11.22) (7.3.5, pre-release, old NPU driver). Each has a prebuilt kernel and its exact source.
 
 This repo is for the **standard Orange Pi 6 only**. Don't use the Plus device tree (`sky1-orangepi-6-plus.dtb`) on it.
 
@@ -121,7 +121,7 @@ boots (`SERIAL=1 scripts/install.sh arm acpi`) use `earlycon=pl011,mmio32,0x040d
 - **Phase 1, GPU:** done (2026-11-18), released as v2026.11.19 and v2026.11.19.1.
 - **Kernel 7:** 7.3.5 merged as an optional track on 2026-11-22 and released as v2026.11.22 (pre-release).
 - **Phase 2, NPU:** working on an open stack (CIX's 6.2.0 driver, Arm China's open `libaipudrv` 4.1.0), see
-  [docs/npu.md](docs/npu.md). Not in a release yet.
+  [docs/npu.md](docs/npu.md). Released in v2026.11.22.1 (6.18.64).
 - Ruled out: the CIX/Canonical vendor kernel and closed Mali stack, NCZ-OS, and the original Orange Pi vendor image
   (it didn't boot on this board). See [HISTORY.md](HISTORY.md).
 

@@ -88,8 +88,9 @@ between the tracks, boot Armbian's kernel, then run `FORCE=1 KERNEL_TRACK=7 scri
 ### Optional: the NPU
 Kernels built from this repo carry CIX's 6.2.0 NPU driver. On the sky1 boot, `scripts/setup.sh npu` builds and
 installs Arm China's open NPU library (`libaipudrv` 4.1.0, into `/usr/local`) and `npu-run`, and prints what the NPU
-reports. Compiled models come from CIX's model hub; see [docs/npu.md](docs/npu.md). No firmware is needed. Release
-kernels up to v2026.11.22 have the older driver, which the library does not work with.
+reports. Compiled models come from CIX's model hub; see [docs/npu.md](docs/npu.md). No firmware is needed. The 6.18.64
+release v2026.11.22.1 has it; the earlier releases, and the 7.3.5 pre-release v2026.11.22, have the older driver,
+which the library does not work with (build 7.3.5 from source for the NPU).
 
 ## How the fallback works
 - Armbian's kernel stays entry 0 in GRUB. The sky1 kernel lives separately in `/boot/sky1/`, so Armbian kernel

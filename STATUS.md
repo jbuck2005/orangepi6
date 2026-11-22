@@ -85,7 +85,7 @@ Details: [docs/npu.md](docs/npu.md).
 - [x] 7.3.5 (module swap, no reboot): probes, 3 cores, MobileNetV2 1.84 ms / 542 per second, sensible ImageNet labels.
 - [x] 6.18.64 full build and boot: loads at boot, MobileNetV2 1.58 ms / 631 per second, same labels as 7.3.5.
 - [ ] Check classification results against the ImageNet labels; more hub models (detection, segmentation).
-- [ ] In a release (v2026.11.22 and earlier have the old driver).
+- [x] Released in v2026.11.22.1 (6.18.64). The 7.3.5 pre-release (v2026.11.22) keeps the old driver until its next build.
 
 ## Ruled out
 - The CIX/Canonical vendor kernel and the closed Mali stack (`Sky1-Linux/cix-gpu-kmd` + `libmali`): closed userspace and no Vulkan.

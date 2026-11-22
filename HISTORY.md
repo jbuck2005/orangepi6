@@ -9,7 +9,7 @@ Kernel lines:
 | Line | Kernel | Where | State |
 |---|---|---|---|
 | 6.18.14 | kernel.org 6.18.14 + Sky1 patches (139) | `main` until PR #1 | released as **v2026.11.19**, superseded |
-| 6.18 LTS | kernel.org 6.18.64 + Sky1 patches, 5 rebased, 6 post patches | `main`, `KERNEL_TRACK=6.18` (default) | released as **v2026.11.19.1** (current default) |
+| 6.18 LTS | kernel.org 6.18.64 + Sky1 patches, 5 rebased, 6 post patches | `main`, `KERNEL_TRACK=6.18` (default) | released as v2026.11.19.1, then **v2026.11.22.1** with the NPU driver (current default) |
 | Kernel 7 | kernel.org 7.3.5 + our forward port of Sky1 patches-next (56 patches) | `main`, `KERNEL_TRACK=7` (merged 2026-11-22; developed on branch `kernel-7`) | released as **v2026.11.22** (pre-release, optional) |
 
 ## Quick index of findings
@@ -518,9 +518,22 @@ Change:
   tree, build and swap only the module, build the library and `npu-run`, fetch MobileNetV2 and YOLOv8n from the
   model hub and benchmark them.
 
+## 2026-11-22: release v2026.11.22.1 (6.18.64 with the NPU driver)
+
+- **Release v2026.11.22.1** (the new default, replaces v2026.11.19.1 as "Latest"): `sky1-kernel-6.18.64-sky1-v2026.11.22.1-arm64.tar.xz`,
+  the matching patched source and `SHA256SUMS`, packaged from the board's native build of `npu` `7a835ef`, whose
+  kernel inputs (patches, `kernel.conf` track settings, fetch/patch/build scripts, DTS) are identical to `main`
+  `be8067b`. That build is the one tested above: the NPU driver loads at boot, MobileNetV2 at 631 runs/s.
+- Since v2026.11.19.1 the 6.18 kernel also gained mainline `r8169` for the NICs (PR #9) and `post/0005` (PERST# kept
+  released on warm reboot).
+- `kernel.conf`: the 6.18 track's `RELEASE_TAG_DEFAULT` is now v2026.11.22.1, so `setup.sh --prebuilt` installs it.
+- The 7.3.5 pre-release v2026.11.22 is unchanged and has the old NPU driver; `setup.sh npu` refuses it. Its next build
+  (with `0056`) can come with the remaining kernel 7 work (more boots, a long load run).
+- README, INSTALL, STATUS and `docs/npu.md` name the release.
+
 ## Open items
 
-- NPU: boot the 6.2.0 driver, build `libaipudrv` 4.1.0 on the board, run hub models, then document and script it.
+- NPU: check classification against ImageNet ground truth; more hub models; 7.3.5 release with `0056`.
 - Kernel 7: confirm `0053` on a storming boot; more boots and a long load run on the released build; CIX display
   drivers; drop the debug patches `0050`/`0051`.
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
