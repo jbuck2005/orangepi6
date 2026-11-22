@@ -1,4 +1,4 @@
-# aiPi (Orange Pi 6) memory stability: firmware and speed A/B, 2026-11-18
+# Orange Pi 6 memory stability: firmware and speed A/B, 2026-11-18
 
 Board: Orange Pi 6 (non-Plus), CIX P1, 16 GB LPDDR5 (4 ch). Official power supply. Kernel 6.18.14-sky1 (ACPI).
 ECC counts come from the firmware's own UART messages (`DDRC IRQ ECC_SBE_WR` / `ECC_DBE_WR`), captured on the debug UART.

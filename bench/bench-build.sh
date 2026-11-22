@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build GPU benchmark tools on aiPi (-j6 only). Logs to ~/bench/build.log.
+# Build GPU benchmark tools on the board (-j6 only). Logs to ~/bench/build.log.
 set -euo pipefail
 mkdir -p ~/bench && cd ~/bench
 exec >> build.log 2>&1
