@@ -12,6 +12,7 @@
 #   6. default     "Sky1 (acpi)" becomes the GRUB default; Armbian stays entry 0 and the
 #                  automatic fallback if a sky1 boot never comes up
 # Then reboot, and run `scripts/setup.sh check` to confirm the GPU.
+# Optional, on the sky1 boot: `scripts/setup.sh npu` builds Arm China's open NPU library and npu-run (docs/npu.md).
 #
 #   scripts/setup.sh --prebuilt   skips steps 3-4: downloads the release kernel (same build process),
 #                                 checks its SHA-256 against the release's SHA256SUMS, then steps 5-6.
@@ -145,6 +146,8 @@ check() {
   ok "Vulkan: $(sed -n 's/.*deviceName *= //p' <<<"$vk" | head -1) (panvk)"
   local egl; egl=$(eglinfo -B -p surfaceless 2>/dev/null || true); grep -q 'Panfrost' <<<"$egl" || die "EGL/GLES does not use Panfrost"
   ok "GLES: Panfrost"
+  if grep -q 'AIPU KMD (v6.2.0)' <<<"$km"; then ok "NPU driver 6.2.0 (optional user space: setup.sh npu)"
+  else warn "NPU driver is not 6.2.0 (only matters for the NPU; see docs/npu.md)"; fi
   [ -n "$(ip -4 route show default)" ] || warn "no default route (see INSTALL.md: NIC link training quirk)"
   # only now is the new kernel known good: drop module trees of older sky1 releases
   if [ "$(sudo grub-editenv list | sed -n 's/^sky1_pending=//p')" = 0 ]; then
@@ -153,6 +156,23 @@ check() {
     warn "keeping older sky1 modules until the boot is confirmed (re-run check later)"
   fi
   echo; echo "All good. Benchmarks: $REPO/scripts/gpu-test.sh"
+}
+
+npu() {
+  say "npu (optional: Arm China's open NPU library and npu-run)"
+  [ "$(uname -r)" = "$KV-sky1" ] || die "running $(uname -r), not $KV-sky1: boot the sky1 kernel first"
+  [ -e /dev/aipu ] || die "no /dev/aipu (is the armchina_npu module loaded? sudo modprobe armchina_npu)"
+  local kmd; kmd=$(sudo dmesg 2>/dev/null | sed -n 's/.*AIPU KMD (v\([0-9.]*\)).*/\1/p' | tail -1)
+  [ "$kmd" = 6.2.0 ] || die "the NPU driver is ${kmd:-unknown}, not 6.2.0: this kernel predates the driver update
+         (patches/6.18.64/post/0012, patches/7.3/0056); build one from this repo"
+  ok "NPU driver 6.2.0"
+  "$REPO/scripts/npu-umd.sh" install > "$WORK/npu-umd.log" 2>&1 || { tail -20 "$WORK/npu-umd.log"; die "libaipudrv build failed"; }
+  ok "libaipudrv 4.1.0 in /usr/local/lib"
+  g++ -std=c++14 -O2 -I/usr/local/include/aipu -o "$WORK/npu-run" "$REPO/tools/npu-run.cpp" -laipudrv \
+    || die "npu-run build failed"
+  sudo install -m 755 "$WORK/npu-run" /usr/local/bin/npu-run
+  npu-run info | sed 's/^/  | /'
+  echo; echo "NPU ready. Models and examples: $REPO/docs/npu.md"
 }
 
 run() {  # $1 = step
@@ -165,6 +185,7 @@ mkdir -p "$WORK"
 case "${1:-all}" in
   all) for s in $STEPS; do run "$s"; done ;;
   preflight|packages|fetch|source|build|stage|default) run "$1" ;;
+  npu) npu ;;
   check) check ;;
-  *) echo "usage: $0 [--prebuilt] [all|preflight|packages|fetch|source|build|stage|default|check]"; exit 2 ;;
+  *) echo "usage: $0 [--prebuilt] [all|preflight|packages|fetch|source|build|stage|default|check|npu]"; exit 2 ;;
 esac

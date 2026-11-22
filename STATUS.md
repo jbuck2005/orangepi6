@@ -76,10 +76,16 @@
 - [ ] CIX display drivers (`DRM_CIX`) port to the 7.x DRM APIs (off for now; headless board).
 - [ ] Drop the debug patches `0050`, `0051` once the reboot and AER work is closed.
 
-## Phase 2: NPU (next)
-- Leads: [visorcraft/orange-pi-6-plus-npu](https://github.com/visorcraft/orange-pi-6-plus-npu), [Sky1-Linux/sky1-drivers-dkms](https://github.com/Sky1-Linux/sky1-drivers-dkms).
-- The vendor NPU driver needs a kbuild rewrite, `-DCONFIG_ARMCHINA_NPU_ARCH_V3 -DBUILD_ZHOUYI_V37`, and `sky1_npu_remove` changed to return void.
-- On the sky1 ACPI boot the in-tree `armchina` driver already probes (`sky1_npu_probe ... done`).
+## Phase 2: NPU (in progress, 2026-11-22)
+Details: [docs/npu.md](docs/npu.md).
+- [x] No firmware needed. The Sky1 series' driver (CIX KMD 1.0.0) has an ABI no current user library speaks.
+- [x] CIX's 6.2.0 driver replaces it on both tracks (`post/0012`, `7.3/0056`), with the Sky1 mainline DVFS/ACPI
+      changes and a fix for buffer frees from `libaipudrv` 4.1.0.
+- [x] Arm China's open `libaipudrv` 4.1.0 builds on the board (`scripts/npu-umd.sh`, `setup.sh npu`).
+- [x] 7.3.5 (module swap, no reboot): probes, 3 cores, MobileNetV2 1.84 ms / 542 per second, sensible ImageNet labels.
+- [ ] 6.18.64 full build and boot with the driver.
+- [ ] Check classification results against the ImageNet labels; more hub models (detection, segmentation).
+- [ ] In a release (v2026.11.22 and earlier have the old driver).
 
 ## Ruled out
 - The CIX/Canonical vendor kernel and the closed Mali stack (`Sky1-Linux/cix-gpu-kmd` + `libmali`): closed userspace and no Vulkan.

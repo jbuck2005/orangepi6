@@ -497,6 +497,12 @@ Change:
   failed at teardown ("V3: invalid PA ... for ASID 48"): `libaipudrv` 4.1.0 leaves `asid` unset in its free request
   and the custom-IOVA path trusted it. Fixed in `0012`/`0056`: the ASID slots don't overlap, so the free takes the
   ASID from the PA when the given one doesn't hold it.
+- Second board test (7.3.5, fixed patch): 0 UMD errors and no driver errors; MobileNetV2 1.84 ms mean, 542 runs/s;
+  the 5 ImageNet validation images in the model's `test_data/` classify into one family each (snakes, birds, dogs).
+  The hub has no YOLO graphs.
+- `scripts/setup.sh npu` (optional step on the sky1 boot): checks the driver is 6.2.0, installs `libaipudrv`, installs
+  `npu-run`, prints `npu-run info`. `setup.sh check` reports the NPU driver version (warning only).
+- `docs/npu.md`, and the NPU in README, INSTALL and STATUS.
 - `bench/npu-bringup.sh`: test on a running sky1 kernel without a reboot: patch the driver into the existing build
   tree, build and swap only the module, build the library and `npu-run`, fetch MobileNetV2 and YOLOv8n from the
   model hub and benchmark them.
