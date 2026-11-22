@@ -69,7 +69,7 @@ Orion O6 / Sky1 XCP boards.
 | PCIe | `pci-sky1` (DT, on mainline's Cadence "HPA" core) | Sky1's vendor host driver with ACPI scan handler, reset, ASPM and link fixes, and its own Cadence core. This is the driver the working 6.18 kernel uses for the NVMe and both NICs, so it replaces mainline's. |
 | GPU (Panthor) | Panthor supports Mali-G720 generically (DT) | CIX Sky1: ACPI ID `CIXH5000`, GPU power-on via raw SCMI-over-SMC call (ACPI has no `smc_devpd`), RCSU mapping, reset and Q-channel clock gating, ACE-Lite bus coherency with shareable cache, NC memory attributes without an IOMMU, SCMI perf-domain DVFS. Ported by hand (7.3 split the register headers and changed the register accessors). |
 | GPU `_CCA` override | none | `soc/cix` ACPI scan handler that marks the GPU non-coherent (firmware says coherent; DT parity) |
-| Network | `r8169` drives RTL8125, but can't run in this ACPI setup the way we need | Vendor `r8125` (built in, as on 6.18; `r8169` stays off), Cadence `macb` ACPI match |
+| Network | `r8169` drives the RTL8125B | Mainline `r8169` (+ `REALTEK_PHY`) since 2026-11-21, as on `main`; vendor `r8125` with `NIC_DRIVER=r8125`. The 2026-11-19 audit kept `r8125`, assuming `r8169` could not run in this ACPI setup; that was never tested, and on 6.18.64 `r8169` works and fixes the warm-reboot NIC loss. Cadence `macb` ACPI match |
 | USB | `cdns3` (7.3 merged cdns3 and cdnsp into one `cdns.ko`) | Sky1 USBSSP glue (`cdnsp-sky1`, `cdnsp-plat`) with ACPI PHY references, RTS5453 Type-C PD. The port keeps mainline's merged core and adds the Sky1 glue as `USB_CDNSP_SKY1`. |
 | Display | none | `linlon-dp` DPU, `trilin` DP, PS185 bridge, `sky1-drm` render bridge |
 | Audio | `cix-ipbloq` HDA (DT) | ACPI support, I2S, SOF DSP, ALC256 quirk |
@@ -344,6 +344,9 @@ Orion O6 / Sky1 XCP boards.
   (and their power-on pin, when it is not standard), but it leaves the root port's LTSSM and
   PHY as they are. To test: boot a sky1 kernel with that hook turned off (a one-line patch or a
   module parameter), warm reboot into Armbian a few times, and count link training failures.
+  Result (on 6.18.64): not the PCIe driver. Realtek's `r8125` leaves the chip in that state at
+  probe; with mainline `r8169` 5 of 5 warm reboots trained. See `docs/nic-r8125-vs-r8169.md`.
+  This branch now builds with `r8169` too (not yet booted on 7.3.5).
 
 ### Warm reboot test plan
 

@@ -43,6 +43,7 @@ load_build() {
   . "$WORK/env.sh"
 }
 
+# Only for an r8125 build (NIC_DRIVER=r8125); the default r8169 reads the real MACs itself.
 # Under the sky1 kernel the vendor r8125 driver cannot read the NICs' MAC addresses in ACPI
 # mode and picks random ones (new DHCP lease, netconsole target missing). Pin each port, by
 # PCI path, to the address Armbian's r8169 reads. Driver=r8125 means Armbian never matches.
@@ -50,6 +51,10 @@ load_build() {
 # Under sky1 the NICs sit behind platform host bridges, so their ID_PATH gains a prefix
 # (platform-sky1-pcie.3.auto-pci-0000:61:00.0); Path= is a glob ending in the PCI address.
 LINK_PREFIX=/etc/systemd/network/10-sky1-
+# NIC driver built into kernel $1 (from its modules.builtin): r8169 or r8125.
+nic_driver() {
+  if grep -q "/r8169\.ko" "$MODROOT/lib/modules/$1/modules.builtin"; then echo r8169; else echo r8125; fi
+}
 write_links() {
   local n path mac drv count=0
   rm -f "$LINK_PREFIX"*.link
@@ -74,6 +79,11 @@ write_links() {
 
 verify_links() {  # $1 = unpacked initrd root
   local f n cnt=0
+  if [ "$(nic_driver "$KREL")" = r8169 ]; then
+    for f in "$LINK_PREFIX"*.link; do [ -e "$f" ] && die "$f left over; r8169 needs no MAC pins (run stage)"; done
+    ok "r8169 kernel: no NIC MAC pins needed"
+    return
+  fi
   for f in "$LINK_PREFIX"*.link; do
     [ -f "$f" ] || die "no $LINK_PREFIX*.link (run stage)"
     grep -qx 'Driver=r8125' "$f" || die "$f does not match only r8125"
@@ -111,9 +121,10 @@ verify() {
   modinfo ${MODROOT:+-b "$MODROOT"} -k "$KREL" panthor >/dev/null 2>&1 || die "module panthor not found for $KREL"
   local vm; vm=$(modinfo ${MODROOT:+-b "$MODROOT"} -k "$KREL" -F vermagic panthor | awk '{print $1}')
   [ "$vm" = "$KREL" ] || die "panthor vermagic '$vm' != '$KREL'"; ok "panthor module present, vermagic matches"
-  for b in nvme ext4 pcie-sky1 phy-cix-pcie ramoops r8125 netconsole; do
+  local nic; nic=$(nic_driver "$KREL")
+  for b in nvme ext4 pcie-sky1 phy-cix-pcie ramoops $nic netconsole; do
     grep -qE "/$b\.ko|/${b//-/_}\.ko" "$M/modules.builtin" || die "$b not built in"
-  done; ok "nvme, ext4, Sky1 PCIe host+PHY, ramoops, r8125, netconsole built in"
+  done; ok "nvme, ext4, Sky1 PCIe host+PHY, ramoops, $nic, netconsole built in"
   cmp -s "$BOOTDIR/vmlinuz" "$SRC/arch/arm64/boot/Image" || die "$BOOTDIR/vmlinuz missing or stale"; ok "kernel in $BOOTDIR matches build"
   cmp -s "$BOOTDIR/$DTB_NAME" "$SRC/arch/arm64/boot/dts/cix/$DTB_NAME" || die "DTB missing or stale"
   local D; D=$(dtc -q -I dtb -O dts "$BOOTDIR/$DTB_NAME") || die "dtc cannot read DTB"
@@ -183,7 +194,11 @@ stage() {
   install -d "$(dirname "$BOOTLOG_FILE")"
   "$REPO/scripts/bootlog-area.sh" setup "$BOOTLOG_FILE" "$BOOTLOG_CONF"
   if [ -f "$WORK/netconsole.conf" ]; then install -m644 "$WORK/netconsole.conf" "$NETCON_CONF"; fi
-  write_links
+  if [ "$(nic_driver "$KREL")" = r8169 ]; then
+    rm -f "$LINK_PREFIX"*.link; ok "r8169 kernel: no NIC MAC pins needed"
+  else
+    write_links
+  fi
   install -m755 "$REPO/initramfs/sky1-bootlog" /usr/sbin/sky1-bootlog
   rm -rf "$CONFDIR"; install -d "$(dirname "$CONFDIR")"
   cp -a /etc/initramfs-tools "$CONFDIR"
