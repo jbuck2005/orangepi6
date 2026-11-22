@@ -79,7 +79,7 @@ runs the library build and the model tests.
 |---|---|
 | Graph load and job creation | 4.0-4.5 ms |
 | Inference, 200 runs (input copy + run) | mean 1.84 ms, p50 1.89 ms, min 1.32 ms, max 2.16 ms: **542 runs/s** |
-| `classify` on the 5 ImageNet validation images in `test_data/` | 1.65-1.81 ms each; top 5 in one family each time (snakes 61/62/54/60/66, birds 91/15/16/133/95, dogs 173/172/166/169/161) |
+| `classify` on 3 of the 5 ImageNet validation images in `test_data/` | 1.65-1.81 ms each; top 5 in one family each time (snakes 61/62/54/60/66, birds 91/15/16/133/95, dogs 173/172/166/169/161) |
 | Driver/library errors | none (after the free fix in the driver patch) |
 
 For comparison, the reference results from the Orange Pi 6 Plus on CIX's own `libnoe` stack (visorcraft) were 13-16 ms

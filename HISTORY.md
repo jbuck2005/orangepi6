@@ -498,7 +498,7 @@ Change:
   and the custom-IOVA path trusted it. Fixed in `0012`/`0056`: the ASID slots don't overlap, so the free takes the
   ASID from the PA when the given one doesn't hold it.
 - Second board test (7.3.5, fixed patch): 0 UMD errors and no driver errors; MobileNetV2 1.84 ms mean, 542 runs/s;
-  the 5 ImageNet validation images in the model's `test_data/` classify into one family each (snakes, birds, dogs).
+  3 of the 5 ImageNet validation images in the model's `test_data/` classify into one family each (snakes, birds, dogs).
   The hub has no YOLO graphs.
 - `scripts/setup.sh npu` (optional step on the sky1 boot): checks the driver is 6.2.0, installs `libaipudrv`, installs
   `npu-run`, prints `npu-run info`. `setup.sh check` reports the NPU driver version (warning only).
