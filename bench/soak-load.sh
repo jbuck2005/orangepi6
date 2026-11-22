@@ -1,5 +1,5 @@
 #!/bin/bash
-# Starts the soak loads on aiPi, detached. Usage: soak-load.sh <seconds>
+# Starts the soak loads on the board, detached. Usage: soak-load.sh <seconds>
 S=${1:?seconds}
 cd ~/bench
 rm -f soak-stress.log soak-vkmark.log

@@ -1,16 +1,16 @@
 #!/bin/bash
-# Combined CPU+memory+GPU soak for aiPi, run from Prometheus (Git Bash).
+# Combined CPU+memory+GPU soak for the board, run from a PC (Git Bash); BOARD=<ssh host> (default opi6), JUMP=<jump host> optional.
 # Usage: bash soak.sh <label> [minutes=60]
 # Every 5 min: ECC corrected/uncorrectable since start (from serial.log), max temp, load, resets.
 set -u
 LABEL=${1:?label}; MIN=${2:-60}
 DIR=$(cd "$(dirname "$0")" && pwd)
 L="$DIR/serial.log"; OUT="$DIR/soak-$LABEL.txt"
-remote() { ssh zeus "ssh aipi '$1'"; }
+remote() { if [ -n "${JUMP:-}" ]; then ssh "$JUMP" "ssh ${BOARD:-opi6} '$1'"; else ssh "${BOARD:-opi6}" "$1"; fi; }
 echo "=== MARK soak $LABEL start $(date +%H:%M:%S)" >> "$L"
 n0=$(wc -l < "$L")
 SECS=$((MIN * 60))
-# Start the loads on aiPi (~/bench/soak-load.sh), detached; each stops on its own after SECS.
+# Start the loads on the board (~/bench/soak-load.sh), detached; each stops on its own after SECS.
 remote "~/bench/soak-load.sh $SECS"
 {
   echo "# soak $LABEL  ${MIN} min  $(date -Is)"
