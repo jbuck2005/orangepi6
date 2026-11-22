@@ -33,12 +33,20 @@ if want "${1:-}" driver; then
     7) P=$REPO/patches/7.3/0056-misc-armchina-npu-update-to-CIX-driver-6.2.0.patch ;;
     *) P=$REPO/patches/6.18.64/post/0012-misc-armchina-npu-update-to-CIX-driver-6.2.0.patch ;;
   esac
-  if grep -q 'KMD_VERSION=\\"6.2.0\\"' "$KT/drivers/misc/armchina-npu/Makefile"; then
-    echo "already patched"
+  # $NPU/applied.patch is the patch now in the tree; a newer one replaces it (from the saved original driver)
+  if [ -f "$NPU/applied.patch" ] && cmp -s "$P" "$NPU/applied.patch"; then
+    echo "already patched with this version"
   else
-    cp -a "$KT/drivers/misc/armchina-npu" "$NPU/armchina-npu.orig"
+    if grep -q 'KMD_VERSION=\\"6.2.0\\"' "$KT/drivers/misc/armchina-npu/Makefile"; then
+      [ -d "$NPU/armchina-npu.orig" ] || { echo "tree has another 6.2.0 patch and no saved original"; exit 1; }
+      rm -rf "$KT/drivers/misc/armchina-npu" && cp -a "$NPU/armchina-npu.orig" "$KT/drivers/misc/armchina-npu"
+      echo "restored the original driver"
+    else
+      rm -rf "$NPU/armchina-npu.orig" && cp -a "$KT/drivers/misc/armchina-npu" "$NPU/armchina-npu.orig"
+    fi
     patch -p1 -d "$KT" -s --dry-run < "$P" && patch -p1 -d "$KT" -s < "$P" || { echo "patch failed"; exit 1; }
-    echo "patched with ${P##*/}"
+    cp "$P" "$NPU/applied.patch"
+    echo "patched with ${P##*/} ($(sha256sum < "$P" | cut -c1-12))"
   fi
 
   step "build the module"
@@ -78,14 +86,45 @@ if want "${1:-}" models; then
 d=json.load(open(sys.argv[1]))
 for f in d["Data"]["Files"]:
     if f["Path"].endswith(".cix"): print(f["Path"], f.get("Size",0))' "$NPU/hub-files.json" | tee "$NPU/hub-cix.txt" | wc -l
-  for pat in '[Mm]obile[Nn]et[_-]*[Vv]2' '[Yy][Oo][Ll][Oo][Vv]8[_-]*n\b'; do
-    p=$(grep -E "$pat" "$NPU/hub-cix.txt" | head -1 | cut -d' ' -f1)
+  grep -i yolo "$NPU/hub-cix.txt" | head -20
+  MNV2=
+  for pat in 'mobilenet[_-]*v2' 'yolo[_-]*v8[_-]*n|yolov8' ; do
+    p=$(grep -i -E "$pat" "$NPU/hub-cix.txt" | head -1 | cut -d' ' -f1)
     [ -n "$p" ] || { echo "no model matching $pat"; continue; }
     f=$NPU/models/${p//\//_}
     mkdir -p "$NPU/models"
     [ -s "$f" ] || curl -fsSL -o "$f" "$HUB/$p" || { echo "download failed: $p"; continue; }
+    case $pat in mobilenet*) MNV2=$f ;; esac
     step "bench $p"
     "$NPU/npu-run" bench "$f" 200
+  done
+
+  step "classify with MobileNetV2"
+  python3 -c 'import PIL, numpy' 2>/dev/null || sudo apt-get install -y -qq python3-pil python3-numpy >/dev/null
+  mdir=$(grep -i -E 'mobilenet[_-]*v2' "$NPU/hub-cix.txt" | head -1 | cut -d' ' -f1); mdir=${mdir%/*}
+  python3 -c 'import json,sys
+d=json.load(open(sys.argv[1]))
+for f in d["Data"]["Files"]:
+    if f["Path"].startswith(sys.argv[2] + "/"): print(f["Path"], f.get("Size",0))' "$NPU/hub-files.json" "$mdir" \
+    | grep -v -i -E '\.(onnx|cix)( |$)' | head -40
+  img=$(python3 -c 'import json,sys
+d=json.load(open(sys.argv[1]))
+for f in d["Data"]["Files"]:
+    p=f["Path"]
+    if p.startswith(sys.argv[2] + "/") and p.lower().endswith((".jpg",".jpeg",".png")):
+        print(p)' "$NPU/hub-files.json" "$mdir" | head -3)
+  lab=$(python3 -c 'import json,sys
+d=json.load(open(sys.argv[1]))
+for f in d["Data"]["Files"]:
+    p=f["Path"]
+    if "imagenet" in p.lower() and p.endswith(".txt"): print(p)' "$NPU/hub-files.json" | head -1)
+  [ -z "$lab" ] || curl -fsSL -o "$NPU/labels.txt" "$HUB/$lab" || true
+  for i in $img; do
+    f=$NPU/images/${i##*/}; mkdir -p "$NPU/images"
+    curl -fsSL -o "$f" "$HUB/$i" || continue
+    python3 "$REPO/tools/npu-prep.py" "$f" "$f.f32" || continue
+    echo "--- ${i##*/}"
+    "$NPU/npu-run" classify "${MNV2:?no MobileNetV2 graph}" "$f.f32" "$NPU/labels.txt" 2>&1 | tail -6
   done
   sudo dmesg | grep -i -E 'aipu|armchina' | tail -10
 fi

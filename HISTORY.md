@@ -490,6 +490,13 @@ Change:
   Cross-built cleanly in the cloud.
 - `tools/npu-run.cpp`: `info` (driver versions, partitions, cores), `bench` (load a `.cix` or ELF graph, time N runs)
   and `classify` (one float32 input, quantized with the graph's scale and zero point, top 5).
+- `tools/npu-prep.py`: image to the float32 NCHW input `classify` reads (ImageNet resize, crop, normalise).
+- First board test (7.3.5, module swap, no reboot): the 6.2.0 driver probes ("AIPU KMD (v6.2.0)", 1 partition,
+  1 cluster, 3 cores, 4 TECs each, custom per-ASID IOVA), `npu-run info` reports target `X2_1204MP3`, UMD 6.0.0,
+  KMD 6.2.0. CIX's MobileNetV2 graph (s8 in/out): **1.89 ms mean, 529 runs/s** over 200 runs. Every buffer free
+  failed at teardown ("V3: invalid PA ... for ASID 48"): `libaipudrv` 4.1.0 leaves `asid` unset in its free request
+  and the custom-IOVA path trusted it. Fixed in `0012`/`0056`: the ASID slots don't overlap, so the free takes the
+  ASID from the PA when the given one doesn't hold it.
 - `bench/npu-bringup.sh`: test on a running sky1 kernel without a reboot: patch the driver into the existing build
   tree, build and swap only the module, build the library and `npu-run`, fetch MobileNetV2 and YOLOv8n from the
   model hub and benchmark them.

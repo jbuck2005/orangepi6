@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: jbuck2005 <59450931+jbuck2005@users.noreply.github.com>
-Date: Sun, 22 Nov 2026 15:59:42 +0000
+Date: Sun, 22 Nov 2026 16:07:54 +0000
 Subject: [PATCH] misc: armchina-npu: update to CIX NPU driver 6.2.0
 
 The Sky1 series carries an old CIX build of the Arm China Zhouyi driver
@@ -26,6 +26,12 @@ kept:
 CIX's newer probe error unwinding, per-core teardown and core-count
 update are kept.
 
+One fix on top: on free, the V3 custom-IOVA path looked the buffer up by
+the ASID in the request, which libaipudrv 4.1.0 leaves uninitialised, so
+every free failed ("invalid PA ... for ASID 48") and buffers leaked until
+the file was closed. The ASID slots do not overlap, so take the ASID from
+the PA when the one given does not hold it.
+
 The KMD_VERSION reported to user space is 6.2.0. No firmware is needed.
 ---
  drivers/misc/armchina-npu/Kconfig             |    6 +-
@@ -41,7 +47,7 @@ The KMD_VERSION reported to user space is 6.2.0. No firmware is needed.
  drivers/misc/armchina-npu/aipu_irq.h          |    3 +-
  drivers/misc/armchina-npu/aipu_job_manager.c  |  420 ++-
  drivers/misc/armchina-npu/aipu_job_manager.h  |   17 +-
- drivers/misc/armchina-npu/aipu_mm.c           | 3313 ++++++++++++++++-
+ drivers/misc/armchina-npu/aipu_mm.c           | 3324 ++++++++++++++++-
  drivers/misc/armchina-npu/aipu_mm.h           |  170 +-
  drivers/misc/armchina-npu/aipu_partition.h    |    8 +-
  drivers/misc/armchina-npu/aipu_priv.c         |   13 +-
@@ -71,7 +77,7 @@ The KMD_VERSION reported to user space is 6.2.0. No firmware is needed.
  drivers/misc/armchina-npu/zhouyi/v3_priv.c    |   38 +-
  drivers/misc/armchina-npu/zhouyi/zhouyi.c     |    6 +-
  drivers/misc/armchina-npu/zhouyi/zhouyi.h     |   12 +-
- 43 files changed, 5312 insertions(+), 1148 deletions(-)
+ 43 files changed, 5323 insertions(+), 1148 deletions(-)
  delete mode 100755 drivers/misc/armchina-npu/zhouyi/v3_1.c
  delete mode 100755 drivers/misc/armchina-npu/zhouyi/v3_1_priv.c
  create mode 100755 drivers/misc/armchina-npu/zhouyi/v3_2.c
@@ -1700,7 +1706,7 @@ index b3d45af1e..4b36c50f6 100755
 +				  u64 *job_id);
  #endif /* __AIPU_JOB_MANAGER_H__ */
 diff --git a/drivers/misc/armchina-npu/aipu_mm.c b/drivers/misc/armchina-npu/aipu_mm.c
-index 03d34a500..c7b2cbbfa 100755
+index 03d34a500..4a33a401a 100755
 --- a/drivers/misc/armchina-npu/aipu_mm.c
 +++ b/drivers/misc/armchina-npu/aipu_mm.c
 @@ -1,5 +1,5 @@
@@ -3112,7 +3118,7 @@ index 03d34a500..c7b2cbbfa 100755
  	tbuf->tail_tcb->next = 0;
  	tbuf->dep_job_id = 0;
  	tbuf->pinned = false;
-@@ -2216,3 +3031,2273 @@ void get_dtcm(struct aipu_memory_manager *mm, u64 *base, u32 *size)
+@@ -2216,3 +3031,2284 @@ void get_dtcm(struct aipu_memory_manager *mm, u64 *base, u32 *size)
  	*base = 0;
  	*size = 0;
  }
@@ -4016,6 +4022,17 @@ index 03d34a500..c7b2cbbfa 100755
 +	/* V3 custom IOVA path */
 +	if (mm->version == AIPU_ISA_VERSION_ZHOUYI_V3 && 
 +	    mm->has_iommu && mm->use_v3_custom_iova) {
++		/*
++		 * The ASID slots do not overlap (ASID n starts at n * 4 GB), so the
++		 * device PA names its ASID. Arm China's libaipudrv 4.1.0 does not
++		 * fill in desc->asid for AIPU_IOCTL_FREE_BUF (it passes whatever
++		 * was on its stack), so take the ASID from the PA when the one
++		 * given does not hold that PA.
++		 */
++		if (!aipu_mm_v3_pa_to_iova(mm, desc->pa, desc->asid) &&
++		    (desc->pa >> 32) < ZHOUYI_ASID_COUNT)
++			desc->asid = desc->pa >> 32;
++
 +		/* Convert PA to IOVA */
 +		iova = aipu_mm_v3_pa_to_iova(mm, desc->pa, desc->asid);
 +		if (!iova) {
