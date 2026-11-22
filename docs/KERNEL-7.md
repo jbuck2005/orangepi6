@@ -339,6 +339,11 @@ Orion O6 / Sky1 XCP boards.
   base 109.04/29.49 tok/s (pp512/tg128) with threads on little cores in 4 of 4 samples;
   NO_SIS_UTIL 122.06/35.88 with one thread on a little core in 1 of 3 samples. That is +12% pp
   and +22% tg, level with pinning to the big cores (121.4/34.7) and with 6.18.64 (123.5/36.5).
+- 2026-11-22, 7.3.5 built with `0055` (0abe703, also the first 7.3.5 boot on r8169), `cpu-diag.sh`:
+  base 121.67/35.70, pin-big 121.33/35.87, nollc 121.28/35.70, noeas 121.37/35.65, perf
+  124.22/36.64. As booted now equals pinned (+0.3% pp, -0.5% tg) and is within about 2% of 6.18.64.
+  One thread still often shows on cpu2/3 in a sample, at no measurable cost. The CPU gap is
+  closed and `taskset` is no longer needed.
 - 2026-11-21, warm reboots: every warm reboot from a sky1 kernel (6.18.64 or 7.3.5) into Armbian
   that night failed NIC link training (Root Port 2/3, LTSSM 0x40C80), and SysRq over serial
   recovered all 9. Reboots from Armbian into a sky1 kernel always trained. So the sky1 kernels
