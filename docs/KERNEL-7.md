@@ -344,6 +344,7 @@ Orion O6 / Sky1 XCP boards.
   124.22/36.64. As booted now equals pinned (+0.3% pp, -0.5% tg) and is within about 2% of 6.18.64.
   One thread still often shows on cpu2/3 in a sample, at no measurable cost. The CPU gap is
   closed and `taskset` is no longer needed.
+  Full write-up of the cause, the method, all numbers and how to reproduce: `docs/kernel7-cpu-scheduling.md`.
 - 2026-11-21, warm reboots: every warm reboot from a sky1 kernel (6.18.64 or 7.3.5) into Armbian
   that night failed NIC link training (Root Port 2/3, LTSSM 0x40C80), and SysRq over serial
   recovered all 9. Reboots from Armbian into a sky1 kernel always trained. So the sky1 kernels
