@@ -70,6 +70,21 @@ scripts/setup.sh check        # panthor, /dev/dri/renderD128, Vulkan = panvk, GL
 scripts/gpu-test.sh           # optional: vulkaninfo, glmark2, vkmark
 ```
 
+### Optional: kernel 7.3.5 instead of 6.18.64
+The repo has two kernel tracks (see `kernel.conf`). **6.18.64 LTS is the default** and the most tested. **7.3.5** is
+kernel.org 7.3.5 with this repo's forward port of the Sky1 patches (`patches/7.3/`). It performs the same as 6.18.64
+on the GPU and the CPU, but has had much less time on the board (see `docs/KERNEL-7.md` and the release notes of
+v2026.11.22). To install it, put `KERNEL_TRACK=7` in front of the setup command:
+```bash
+KERNEL_TRACK=7 scripts/setup.sh --prebuilt     # or KERNEL_TRACK=7 scripts/setup.sh to build it (about 25 min)
+sudo reboot
+scripts/setup.sh check                         # remembers the track; no prefix needed
+```
+Only one sky1 kernel is installed at a time; Armbian's kernel stays entry 0 either way. To switch an installed board
+between the tracks, boot Armbian's kernel, then run `FORCE=1 KERNEL_TRACK=7 scripts/setup.sh --prebuilt` (or
+`KERNEL_TRACK=6.18` to go back), reboot, and run `scripts/setup.sh check`. On 7.3.5 the CIX display drivers are off
+(they don't build on 7.x yet); the board runs headless and the GPU is not affected.
+
 ## How the fallback works
 - Armbian's kernel stays entry 0 in GRUB. The sky1 kernel lives separately in `/boot/sky1/`, so Armbian kernel
   updates don't touch it.

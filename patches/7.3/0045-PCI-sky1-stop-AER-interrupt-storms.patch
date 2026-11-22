@@ -1,0 +1,164 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: orangepi6 kernel-7 port
+Subject: [PATCH] PCI sky1 stop AER interrupt storms
+
+On 7.3.5 the NVMe root port's AER line fired continuously right after link
+training (1730 interrupts in 19 s) with nothing latched: root error status 0,
+no correctable/uncorrectable status and no error bits in DEVSTA. The handler
+still returned IRQ_HANDLED and logged two lines per interrupt to the serial
+console with the AER spinlock held and interrupts off, which ended in a hard
+lockup and panic. 6.18 with the same driver code never saw the interrupt.
+
+- Read root, correctable and uncorrectable status and DEVSTA first. If none
+  shows an error, return IRQ_NONE, warn (rate-limited), and after 64 such
+  interrupts in a row disable that AER line.
+- Rate-limit the remaining AER logging and print it after dropping the lock;
+  the per-interrupt dev_sts prints become dev_dbg.
+- Log the local/AER IRQ numbers at probe so a board log shows which line
+  misbehaves.
+
+The root cause (why the line asserts on 7.x) is not known yet.
+---
+ drivers/pci/controller/cadence/pci-sky1.c | 68 +++++++++++++++++++++++++++----
+ drivers/pci/controller/cadence/pci-sky1.h |  2 +
+ 2 files changed, 61 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/pci/controller/cadence/pci-sky1.c b/drivers/pci/controller/cadence/pci-sky1.c
+index b5cb57493..b48f713d2 100644
+--- a/drivers/pci/controller/cadence/pci-sky1.c
++++ b/drivers/pci/controller/cadence/pci-sky1.c
+@@ -615,7 +615,7 @@ static void sky1_pcie_handle_rp_aer_irq(struct sky1_pcie *pcie)
+ 	uncorr_val = readl(reg_base + aer_offset + PCI_ERR_UNCOR_STATUS);
+ 	corr_val = readl(reg_base + aer_offset + PCI_ERR_COR_STATUS);
+ 	dev_sts = readl(reg_base + offset + PCI_EXP_DEVCTL);
+-	dev_info(dev, "RC's dev_sts: 0x%08x\n", dev_sts);
++	dev_dbg(dev, "RC's dev_sts: 0x%08x\n", dev_sts);
+ 	if (uncorr_val) {
+ 		dev_err(dev, "RC's PCI_ERR_UNCOR_STATUS: 0x%x\n", uncorr_val);
+ 		if (!pcie->aer_uncor_dump) {
+@@ -693,7 +693,7 @@ static void sky1_pcie_handle_ep_aer_irq(struct sky1_pcie *pcie)
+ 	pci_read_config_dword(ep_pdev, aer_offset + PCI_ERR_COR_STATUS,
+ 			      &corr_val);
+ 	pci_read_config_dword(ep_pdev, offset + PCI_EXP_DEVCTL, &dev_sts);
+-	dev_info(dev, "EP's dev_sts: 0x%08x\n", dev_sts);
++	dev_dbg(dev, "EP's dev_sts: 0x%08x\n", dev_sts);
+ 	if (uncorr_val)
+ 		dev_err(dev, "EP's PCI_ERR_UNCOR_STATUS: 0x%x\n", uncorr_val);
+ 	if (corr_val)
+@@ -714,12 +714,31 @@ static void sky1_pcie_handle_ep_aer_irq(struct sky1_pcie *pcie)
+ 			       uncorr_val);
+ }
+ 
++static const char *sky1_pcie_aer_irq_name(struct sky1_pcie *pcie, int irq)
++{
++	if (irq == pcie->aer_c_irq)
++		return "aer_c";
++	if (irq == pcie->aer_f_irq)
++		return "aer_f";
++	if (irq == pcie->aer_nf_irq)
++		return "aer_nf";
++	return "?";
++}
++
++/*
++ * Give up on an AER line after this many interrupts in a row that found no
++ * error status anywhere: nothing here can clear the source, and on 7.3 the
++ * line was seen re-firing forever (1730 times in 19 s) until a hard lockup.
++ */
++#define SKY1_AER_SPURIOUS_LIMIT		64
++
+ static irqreturn_t sky1_pcie_aer_irq_handler(int irq, void *arg)
+ {
+ 	struct sky1_pcie *pcie = arg;
+ 	void __iomem *reg_base;
+ 	u16 aer_offset = 0;
+-	u32 sta, source_id;
++	u8 cap_offset;
++	u32 sta, source_id, corr, uncorr, devsta = 0;
+ 	unsigned long flags;
+ 	irqreturn_t ret;
+ #define _AER_ERR_STATUS_MASK                             \
+@@ -731,17 +750,42 @@ static irqreturn_t sky1_pcie_aer_irq_handler(int irq, void *arg)
+ 	aer_offset =
+ 		sky1_pcie_find_ext_capability(reg_base, PCI_EXT_CAP_ID_ERR);
+ 	if (!aer_offset) {
+-		dev_err(pcie->dev, "RC no aer capability\n");
+-		ret = IRQ_NONE;
+-		goto unlock;
++		spin_unlock_irqrestore(&pcie->aer_lock, flags);
++		dev_err_ratelimited(pcie->dev, "RC no aer capability\n");
++		return IRQ_NONE;
+ 	}
+ 
+ 	sta = readl(reg_base + aer_offset + PCI_ERR_ROOT_STATUS);
++	source_id = readl(reg_base + aer_offset + PCI_ERR_ROOT_ERR_SRC);
++	corr = readl(reg_base + aer_offset + PCI_ERR_COR_STATUS);
++	uncorr = readl(reg_base + aer_offset + PCI_ERR_UNCOR_STATUS);
++	cap_offset = sky1_pcie_find_capability(reg_base, PCI_CAP_ID_EXP);
++	if (cap_offset)
++		devsta = readl(reg_base + cap_offset + PCI_EXP_DEVCTL) >> 16;
++
++	if (!sta && !corr && !uncorr &&
++	    !(devsta & (PCI_EXP_DEVSTA_CED | PCI_EXP_DEVSTA_NFED |
++			PCI_EXP_DEVSTA_FED))) {
++		/* Nothing latched: not ours, or a source we cannot clear. */
++		unsigned int n = ++pcie->aer_spurious;
++
++		spin_unlock_irqrestore(&pcie->aer_lock, flags);
++		dev_warn_ratelimited(pcie->dev,
++			"spurious AER irq %d (%s), no error status (%u in a row)\n",
++			irq, sky1_pcie_aer_irq_name(pcie, irq), n);
++		if (n == SKY1_AER_SPURIOUS_LIMIT) {
++			dev_err(pcie->dev,
++				"AER irq %d (%s): %u interrupts with no error status, disabling it\n",
++				irq, sky1_pcie_aer_irq_name(pcie, irq), n);
++			disable_irq_nosync(irq);
++		}
++		return IRQ_NONE;
++	}
++	pcie->aer_spurious = 0;
++
+ 	/* Clear root error status */
+ 	writel(sta, (reg_base + aer_offset + PCI_ERR_ROOT_STATUS));
+-	source_id = readl(reg_base + aer_offset + PCI_ERR_ROOT_ERR_SRC);
+ 
+-	dev_info(pcie->dev, "root err status =0x%x,id = 0x%x", sta, source_id );
+ 	if (!(sta & _AER_ERR_STATUS_MASK))
+ 		/* local AER error flow */
+ 		sky1_pcie_handle_rp_aer_irq(pcie);
+@@ -751,8 +795,10 @@ static irqreturn_t sky1_pcie_aer_irq_handler(int irq, void *arg)
+ 
+ 	ret = IRQ_HANDLED;
+ 
+-unlock:
+ 	spin_unlock_irqrestore(&pcie->aer_lock, flags);
++	dev_info_ratelimited(pcie->dev,
++		"AER irq %d (%s): root err status 0x%x, source id 0x%x, cor 0x%x, uncor 0x%x\n",
++		irq, sky1_pcie_aer_irq_name(pcie, irq), sta, source_id, corr, uncorr);
+ 	return ret;
+ }
+ 
+@@ -1610,6 +1656,10 @@ static int sky1_pcie_parse_aer_irq(struct sky1_pcie *pcie)
+ 		pcie->aer_nf_irq = platform_get_irq_byname(pdev, "aer_nf");
+ 	}
+ 
++	dev_info(dev, "irqs: local %d, aer_c %d, aer_f %d, aer_nf %d\n",
++		 pcie->local_irq, pcie->aer_c_irq, pcie->aer_f_irq,
++		 pcie->aer_nf_irq);
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/pci/controller/cadence/pci-sky1.h b/drivers/pci/controller/cadence/pci-sky1.h
+index 409be5b92..2eb48e58e 100644
+--- a/drivers/pci/controller/cadence/pci-sky1.h
++++ b/drivers/pci/controller/cadence/pci-sky1.h
+@@ -152,6 +152,8 @@ struct sky1_pcie {
+ 	struct mutex pme_mutex;
+ 	struct sky1_aer_stats aer_stats;
+ 	bool aer_uncor_dump;
++	/* consecutive AER interrupts that found no error status */
++	unsigned int aer_spurious;
+ 
+ 	struct phy *pcie_phy;
+ 	struct workqueue_struct *wk;

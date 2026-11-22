@@ -1,0 +1,84 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: orangepi6 kernel-7 port
+Subject: [PATCH] DEBUG PCI sky1 dump registers when an AER line is disabled
+
+0049's latched-local-error theory did not hold: the storm came back on
+aer_nf with no local error latched. When 0045 gives up on a line, dump
+once everything that could hold it asserted: the AER and PCIe capability
+registers of the root port, root control/status, the local error status
+and mask registers, the debug status register, the RCSU app status words,
+and the IRQ trigger type. Drop once the source is found.
+---
+ drivers/pci/controller/cadence/pci-sky1.c | 45 +++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
+
+diff --git a/drivers/pci/controller/cadence/pci-sky1.c b/drivers/pci/controller/cadence/pci-sky1.c
+index 7458797e1..7c937836f 100644
+--- a/drivers/pci/controller/cadence/pci-sky1.c
++++ b/drivers/pci/controller/cadence/pci-sky1.c
+@@ -11,6 +11,7 @@
+ #include <linux/gpio/consumer.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
++#include <linux/irq.h>
+ #include <linux/io.h>
+ #include <linux/iopoll.h>
+ #include <linux/of.h>
+@@ -751,6 +752,49 @@ static const char *sky1_pcie_aer_irq_name(struct sky1_pcie *pcie, int irq)
+ 	return "?";
+ }
+ 
++static u32 sky1_phy_readl_phy_status(struct sky1_pcie *pcie, u32 reg);
++
++/* One-time dump of everything that could be holding an AER line asserted. */
++static void sky1_pcie_aer_dump(struct sky1_pcie *pcie, int irq)
++{
++	void __iomem *rp = pcie->reg_base + CDNS_PCIE_RP_BASE;
++	u16 aer = sky1_pcie_find_ext_capability(rp, PCI_EXT_CAP_ID_ERR);
++	u8 exp = sky1_pcie_find_capability(rp, PCI_CAP_ID_EXP);
++	struct device *dev = pcie->dev;
++	u32 phy[4];
++	int i;
++
++	dev_err(dev, "AER dump irq %d (%s): trigger type 0x%x\n", irq,
++		sky1_pcie_aer_irq_name(pcie, irq), irq_get_trigger_type(irq));
++	if (aer)
++		dev_err(dev, "AER cap 0x%x: uncor sts 0x%08x mask 0x%08x sev 0x%08x, cor sts 0x%08x mask 0x%08x, cap/ctl 0x%08x, root cmd 0x%08x sts 0x%08x src 0x%08x\n",
++			aer, readl(rp + aer + PCI_ERR_UNCOR_STATUS),
++			readl(rp + aer + PCI_ERR_UNCOR_MASK),
++			readl(rp + aer + PCI_ERR_UNCOR_SEVER),
++			readl(rp + aer + PCI_ERR_COR_STATUS),
++			readl(rp + aer + PCI_ERR_COR_MASK),
++			readl(rp + aer + PCI_ERR_CAP),
++			readl(rp + aer + PCI_ERR_ROOT_COMMAND),
++			readl(rp + aer + PCI_ERR_ROOT_STATUS),
++			readl(rp + aer + PCI_ERR_ROOT_ERR_SRC));
++	if (exp)
++		dev_err(dev, "PCIe cap 0x%x: devctl/sta 0x%08x lnkctl/sta 0x%08x rtctl 0x%08x rtsta 0x%08x\n",
++			exp, readl(rp + exp + PCI_EXP_DEVCTL),
++			readl(rp + exp + PCI_EXP_LNKCTL),
++			readl(rp + exp + PCI_EXP_RTCTL),
++			readl(rp + exp + PCI_EXP_RTSTA));
++	dev_err(dev, "local err0 sts 0x%08x mask 0x%08x, err1 sts 0x%08x mask 0x%08x, dbg0 0x%08x\n",
++		readl(rp + I_LOCAL_ERR_STS_REG0), readl(rp + I_LOCAL_ERR_MASK_REG0),
++		readl(rp + I_LOCAL_ERR_STS_REG1), readl(rp + I_LOCAL_ERR_MASK_REG1),
++		sky1_pcie_ctrl_readl_reg(pcie, IP_REG_I_DBG_STS_0));
++	mutex_lock(&sky1_init_mutex);
++	for (i = 0; i < 4; i++)
++		phy[i] = sky1_phy_readl_phy_status(pcie, STATUS_REG(i));
++	mutex_unlock(&sky1_init_mutex);
++	dev_err(dev, "app status 0-3: 0x%08x 0x%08x 0x%08x 0x%08x\n",
++		phy[0], phy[1], phy[2], phy[3]);
++}
++
+ /*
+  * Give up on an AER line after this many interrupts in a row that found no
+  * error status anywhere: nothing here can clear the source, and on 7.3 the
+@@ -812,6 +856,7 @@ static irqreturn_t sky1_pcie_aer_irq_handler(int irq, void *arg)
+ 			dev_err(pcie->dev,
+ 				"AER irq %d (%s): %u interrupts with no error status, disabling it\n",
+ 				irq, sky1_pcie_aer_irq_name(pcie, irq), n);
++			sky1_pcie_aer_dump(pcie, irq);
+ 			disable_irq_nosync(irq);
+ 		}
+ 		return IRQ_NONE;

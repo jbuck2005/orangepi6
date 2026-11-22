@@ -1,0 +1,151 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Entrpi <entrpi@proton.me>
+Date: Sat, 28 Feb 2026 16:40:09 +1100
+Subject: [PATCH] drm/cix/dptx: suppress spurious ELD warnings at boot
+
+At boot the hdmi-codec plugged callback fires before EDID has been
+read, so the connector ELD is all-zeros.  Returning that from get_eld
+causes snd_parse_eld to log "HDMI: Unknown ELD version 0" for every
+DPTX instance.
+
+Check that the ELD baseline length is non-zero before copying it;
+otherwise return zeros so hdmi-codec knows the ELD is not yet
+available.
+
+[Forward-ported from Sky1-Linux linux-sky1 57e018a patches-next (base v7.0-rc1)
+ to v7.3.5: hdmi-codec: Sky1's no-sink handling rewritten for the guard(mutex) structure.]
+---
+ drivers/gpu/drm/cix/dptx/trilin_dptx.c       | 11 +++++++++--
+ drivers/gpu/drm/cix/dptx/trilin_dptx_audio.c | 28 ++++++++++++++++++++--------
+ drivers/gpu/drm/cix/dptx/trilin_drm.c        |  6 ++++++
+ sound/soc/codecs/hdmi-codec.c                | 24 +++++++++++++-----------
+ 4 files changed, 48 insertions(+), 21 deletions(-)
+
+diff --git a/drivers/gpu/drm/cix/dptx/trilin_dptx.c b/drivers/gpu/drm/cix/dptx/trilin_dptx.c
+index 2dbe1abdc..f8ff7823d 100644
+--- a/drivers/gpu/drm/cix/dptx/trilin_dptx.c
++++ b/drivers/gpu/drm/cix/dptx/trilin_dptx.c
+@@ -2766,8 +2766,15 @@ static void trilin_dp_hpd_event_work_func(struct work_struct *work)
+ 	if (dp->drm[0])
+ 		drm_helper_hpd_irq_event(dp->drm[0]);
+ 
+-	DP_DEBUG("dp audio plugin status = %d\n", dp->plugin);
+-	dptx_audio_handle_plugged_change(dp_audio, dp->plugin);
++	/* Audio plugged notification is deferred to
++	 * trilin_connector_update_modes(), after the ELD has been
++	 * populated from EDID.  Firing it here would race — the
++	 * connector probe triggered above is asynchronous.
++	 *
++	 * For unplug, notify immediately so hdmi-codec can clear state.
++	 */
++	if (!dp->plugin)
++		dptx_audio_handle_plugged_change(dp_audio, false);
+ 
+ 	cix_hdcp_hpd_event_process(&dp->hdcp, dp->plugin);
+ }
+diff --git a/drivers/gpu/drm/cix/dptx/trilin_dptx_audio.c b/drivers/gpu/drm/cix/dptx/trilin_dptx_audio.c
+index a56927404..0119509f0 100644
+--- a/drivers/gpu/drm/cix/dptx/trilin_dptx_audio.c
++++ b/drivers/gpu/drm/cix/dptx/trilin_dptx_audio.c
+@@ -2,6 +2,7 @@
+ /* Copyright 2024 Cix Technology Group Co., Ltd. */
+ #include <linux/kernel.h>
+ #include <linux/hdmi.h>
++#include <drm/drm_eld.h>
+ #include "trilin_dptx_reg.h"
+ #include "trilin_dptx.h"
+ #include "dptx_infoframe.h"
+@@ -122,11 +123,17 @@ static int dptx_audio_get_eld(struct device *dev, void *data,
+ {
+ 	struct trilin_dp *dp = data;
+ 
+-	if (dp->plugin)
+-		memcpy(buf, dp->connector.base.eld,
+-		       min(sizeof(dp->connector.base.eld), len));
+-	else
+-		memset(buf, 0, len);
++	/* Only copy the ELD if the sink is connected AND the ELD has
++	 * been populated from EDID (baseline_eld_len > 0).  At boot
++	 * the plugged callback fires before EDID is read, so the
++	 * connector ELD is still all-zeros — returning that causes
++	 * noisy "Unknown ELD version 0" warnings from snd_parse_eld.
++	 */
++	if (!dp->plugin || !dp->connector.base.eld[DRM_ELD_BASELINE_ELD_LEN])
++		return -ENODEV;
++
++	memcpy(buf, dp->connector.base.eld,
++	       min(sizeof(dp->connector.base.eld), len));
+ 
+ 	return 0;
+ }
+@@ -207,9 +214,14 @@ static int dptx_audio_hook_plugged_cb(struct device *dev, void *data,
+ 	dp_audio->plugged_cb = fn;
+ 	dp_audio->codec_dev = codec_dev;
+ 
+-	/* dp plugin event report before this callback install when boot, have a check here */
+-	dev_dbg(dp->dev, "dp audio plugin status = %d\n", dp->plugin);
+-	dptx_audio_handle_plugged_change(dp_audio, dp->plugin);
++	/* Only fire the initial plugged notification if the ELD has
++	 * already been populated (i.e. EDID was read before hdmi-codec
++	 * registered).  Otherwise, trilin_connector_update_modes()
++	 * will fire it after the ELD is ready.  This avoids the
++	 * "Unknown ELD version 0" warning from snd_parse_eld.
++	 */
++	if (dp->plugin && dp->connector.base.eld[DRM_ELD_BASELINE_ELD_LEN])
++		dptx_audio_handle_plugged_change(dp_audio, true);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/gpu/drm/cix/dptx/trilin_drm.c b/drivers/gpu/drm/cix/dptx/trilin_drm.c
+index 423b3f018..934148548 100644
+--- a/drivers/gpu/drm/cix/dptx/trilin_drm.c
++++ b/drivers/gpu/drm/cix/dptx/trilin_drm.c
+@@ -232,6 +232,12 @@ int trilin_connector_update_modes(struct drm_connector *connector,
+ 	drm_connector_update_edid_property(connector, edid);
+ 	ret = drm_add_edid_modes(connector, edid);
+ 
++	/* Notify hdmi-codec now that the ELD is populated from EDID.
++	 * The HPD handler deliberately skips this notification so that
++	 * hdmi-codec never sees an empty ELD.
++	 */
++	dptx_audio_handle_plugged_change(&dp->dp_audio, dp->plugin);
++
+ 	return ret;
+ }
+ 
+diff --git a/sound/soc/codecs/hdmi-codec.c b/sound/soc/codecs/hdmi-codec.c
+index 7aa50c5bd..601d91f1b 100644
+--- a/sound/soc/codecs/hdmi-codec.c
++++ b/sound/soc/codecs/hdmi-codec.c
+@@ -472,18 +472,20 @@ static int hdmi_codec_startup(struct snd_pcm_substream *substream,
+ 	if (tx && hcp->hcd.ops->get_eld) {
+ 		ret = hcp->hcd.ops->get_eld(dai->dev->parent, hcp->hcd.data,
+ 					    hcp->eld, sizeof(hcp->eld));
+-		if (ret)
++		if (ret == -ENODEV) {
++			/* No sink connected; allow open without ELD constraints */
++			ret = 0;
++		} else if (ret) {
+ 			return ret;
+-
+-		snd_parse_eld(dai->dev, &hcp->eld_parsed,
+-			      hcp->eld, sizeof(hcp->eld));
+-
+-		ret = snd_pcm_hw_constraint_eld(substream->runtime, hcp->eld);
+-		if (ret)
+-			return ret;
+-
+-		/* Select chmap supported */
+-		hdmi_codec_eld_chmap(hcp);
++		} else {
++			ret = snd_pcm_hw_constraint_eld(substream->runtime,
++							hcp->eld);
++			if (ret)
++				return ret;
++
++			/* Select chmap supported */
++			hdmi_codec_eld_chmap(hcp);
++		}
+ 	}
+ 
+ 	hcp->busy = true;
