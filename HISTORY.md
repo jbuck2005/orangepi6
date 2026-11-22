@@ -25,6 +25,7 @@ Kernel lines:
 | Software GPIO power switch for the NICs is a dead end | [2026-11-19](#2026-11-19-nic-link-training-after-warm-reboots) |
 | Kernel 7 warm reboot hangs at the watchdog | [2026-11-19](#2026-11-19-kernel-7-track-735) |
 | Kernel 7 AER storm: an unacked LTSSM-transition bit; CPU gap is thread placement | [2026-11-21](#2026-11-21-kernel-7-aer-fix-cpu-placement-warm-reboots-into-armbian) |
+| Kernel 7 CPU gap: wakeup scan cut short by SIS_UTIL; fixed by `0055` | [2026-11-22](#2026-11-22-kernel-7-cpu-gap-fixed) |
 | Smart-plug workaround for lost NICs merged (needs RTC battery) | [2026-11-21](#2026-11-21-smart-plug-workaround-for-lost-nics-merged) |
 | Board draws ~17 W idle and 30-36 W under load at the wall | [2026-11-20](#2026-11-20-power-draw) |
 | Build-load crashes at 6000 MT/s track NVMe controller heat; an 8 h full-build run passes with a fan on the SSD | [2026-11-21](#2026-11-21-stability-at-6000-mts-nvme-heat) |
@@ -369,11 +370,26 @@ Firmware v1.0_for_opi6_linux (2026-10-19), memory at 6000 MT/s unless noted. The
 - `bench/stability.sh`: the multi-hour run. It logs every step to `~/stability.log` and to the kernel log, so the
   record survives on a serial capture if the board dies.
 
+## 2026-11-22: kernel 7 CPU gap fixed
+
+Branch `kernel-7`; details in `docs/KERNEL-7.md` there.
+
+- `85cdb1d` `0055` sched/fair: scan the whole asymmetric-capacity domain on wakeup. 7.x added the SIS_UTIL
+  `nr_idle_scan` limit to `select_idle_capacity()`. With 8 of 12 CPUs busy it stops the scan after about 6 CPUs
+  counted from the wakeup target, so from cpu0/1 it picks an idle little core (cpu2-5) before it reaches the idle
+  big cores. 6.18 scanned the whole domain, and `0055` restores that. `bench/sched-ab.sh` gains a `no-sis-util`
+  variant.
+
+**Findings:**
+- Turning SIS_UTIL off at runtime on 7.3.5 confirmed the cause: 109.0/29.5 → 122.1/35.9 tok/s (pp512/tg128).
+- 7.3.5 built with `0055` (`0abe703`): as booted 121.7/35.7, pinned to the big cores 121.3/35.9. That is within
+  about 2% of 6.18.64 (123.5/36.5), so `taskset` is no longer needed. The same boot was the first 7.3.5 boot on
+  `r8169`, and it came up with the real MACs and both NICs.
+
 ## Open items
 
 - NPU (phase 2): the in-tree `armchina` driver already probes on the sky1 ACPI boot. Leads:
   visorcraft/orange-pi-6-plus-npu, Sky1-Linux/sky1-drivers-dkms.
-- Kernel 7: CPU thread placement (~12% slower); confirm `0053` on a storming boot; CIX display drivers.
+- Kernel 7: confirm `0053` on a storming boot; CIX display drivers.
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
-- Kernel 7 (`kernel-7` branch): boot-test its `r8169` build.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.
