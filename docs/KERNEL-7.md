@@ -335,6 +335,10 @@ Orion O6 / Sky1 XCP boards.
   which fits the tg-only probe showing no little-core placement. Runtime test with no build:
   `bench/sched-ab.sh base no-sis-util` (turns SIS_UTIL off through debugfs). Fix: `0055` scans
   the whole domain again.
+- 2026-11-22, confirmed on 7.3.5 (6000 MT/s, NVMe fan on), `sched-ab.sh base no-sis-util`:
+  base 109.04/29.49 tok/s (pp512/tg128) with threads on little cores in 4 of 4 samples;
+  NO_SIS_UTIL 122.06/35.88 with one thread on a little core in 1 of 3 samples. That is +12% pp
+  and +22% tg, level with pinning to the big cores (121.4/34.7) and with 6.18.64 (123.5/36.5).
 - 2026-11-21, warm reboots: every warm reboot from a sky1 kernel (6.18.64 or 7.3.5) into Armbian
   that night failed NIC link training (Root Port 2/3, LTSSM 0x40C80), and SysRq over serial
   recovered all 9. Reboots from Armbian into a sky1 kernel always trained. So the sky1 kernels
