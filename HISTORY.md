@@ -30,7 +30,7 @@ Kernel lines:
 | Smart-plug workaround for lost NICs merged (needs RTC battery) | [2026-11-21](#2026-11-21-smart-plug-workaround-for-lost-nics-merged) |
 | Board draws ~17 W idle and 30-36 W under load at the wall | [2026-11-20](#2026-11-20-power-draw) |
 | Build-load crashes at 6000 MT/s track NVMe controller heat; an 8 h full-build run passes with a fan on the SSD | [2026-11-21](#2026-11-21-stability-at-6000-mts-nvme-heat) |
-| NPU needs no firmware; the Sky1 driver ABI is too old for current user space | [2026-11-22](#2026-11-22-npu-phase-started-driver-updated-to-cix-620) |
+| NPU works on an open stack (CIX driver 6.2.0, libaipudrv 4.1.0); no firmware needed | [2026-11-22](#2026-11-22-npu-phase-started-driver-updated-to-cix-620) |
 | Fuzzy patching misplaced an arm_scmi hunk into a NULL dereference | [2026-11-19](#2026-11-19-kernel-61864-lts) |
 
 ---
@@ -500,6 +500,9 @@ Change:
 - Second board test (7.3.5, fixed patch): 0 UMD errors and no driver errors; MobileNetV2 1.84 ms mean, 542 runs/s;
   3 of the 5 ImageNet validation images in the model's `test_data/` classify into one family each (snakes, birds, dogs).
   The hub has no YOLO graphs.
+- Third board test, the default track: a full 6.18.64 build from `npu` (145 patches exact, `0012` added, 21 min at
+  `-j6`), staged from Armbian, one-shot boot. The driver loads at boot ("AIPU KMD (v6.2.0)", 3 cores); NICs up with
+  real MACs. MobileNetV2 1.58 ms mean, **631 runs/s**; the same top 5 as on 7.3.5; 0 library or driver errors.
 - `scripts/setup.sh npu` (optional step on the sky1 boot): checks the driver is 6.2.0, installs `libaipudrv`, installs
   `npu-run`, prints `npu-run info`. `setup.sh check` reports the NPU driver version (warning only).
 - `docs/npu.md`, and the NPU in README, INSTALL and STATUS.

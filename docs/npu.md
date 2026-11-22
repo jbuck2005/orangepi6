@@ -1,6 +1,6 @@
 # NPU (Arm China Zhouyi X2) on the Orange Pi 6
 
-Status: **working** on 7.3.5 (2026-11-22, module swap without a reboot). The 6.18.64 build and boot test is next.
+Status: **working** (2026-11-22) on 6.18.64 (full build, loads at boot) and 7.3.5 (module swap without a reboot).
 Not in a release yet: v2026.11.22 and earlier have the old driver.
 
 ## What the NPU is
@@ -73,14 +73,19 @@ runs the library build and the model tests.
 
 ## Results
 
-7.3.5-sky1, memory at 6000 MT/s, CIX's MobileNetV2 graph (s8 input 1x3x224x224, s8 output 1000):
+Memory at 6000 MT/s, CIX's MobileNetV2 graph (s8 input 1x3x224x224, s8 output 1000), 200 runs (input copy + run):
 
-| | |
-|---|---|
-| Graph load and job creation | 4.0-4.5 ms |
-| Inference, 200 runs (input copy + run) | mean 1.84 ms, p50 1.89 ms, min 1.32 ms, max 2.16 ms: **542 runs/s** |
-| `classify` on 3 of the 5 ImageNet validation images in `test_data/` | 1.65-1.81 ms each; top 5 in one family each time (snakes 61/62/54/60/66, birds 91/15/16/133/95, dogs 173/172/166/169/161) |
-| Driver/library errors | none (after the free fix in the driver patch) |
+| | 6.18.64-sky1 (full build, boot) | 7.3.5-sky1 (module swap) |
+|---|---|---|
+| Graph load and job creation | 3.7 ms | 4.0-4.5 ms |
+| Inference mean / p50 | 1.58 / 1.57 ms | 1.84 / 1.89 ms |
+| Inference min / max | 1.04 / 2.20 ms | 1.32 / 2.16 ms |
+| Throughput | **631 runs/s** | 542 runs/s |
+| `classify`, 3 of the 5 sample images | 1.42-1.71 ms | 1.65-1.81 ms |
+| Driver/library errors | none | none (after the free fix) |
+
+`classify` gives the same top 5 on both kernels, each in one family: snakes (61, 62, 54, 60, 66), birds (91, 15,
+16, 133, 95), dogs (173, 172, 166, 169, 161).
 
 For comparison, the reference results from the Orange Pi 6 Plus on CIX's own `libnoe` stack (visorcraft) were 13-16 ms
 for CLIP and YOLOv8n graphs; MobileNetV2 is a much smaller network.

@@ -88,7 +88,7 @@ rechargeable cell. Until one is fitted, set the memory speed and power-loss beha
 | vkmark (headless) | 3460-3544 (llvmpipe: 741) |
 | llama.cpp CPU, Qwen2.5-1.5B Q4_K_M | 124 tok/s prompt, 36.6 tok/s generation |
 | llama.cpp CPU, Qwen2.5-7B Q4_K_M | 33.7 / 8.75 tok/s |
-| NPU, CIX MobileNetV2 (s8) | 1.84 ms per run, 542 runs/s (`npu-run bench`, 7.3.5) |
+| NPU, CIX MobileNetV2 (s8) | 1.58 ms per run, 631 runs/s (`npu-run bench`, 6.18.64) |
 | Memory stability | firmware 2026-10-19: 0 ECC errors at 5500/6000/6400 MT/s; 1 h load at 6000 and 6400 on 6.18.64 |
 
 Details: [bench/MEMORY-AB-REPORT.md](bench/MEMORY-AB-REPORT.md) and [STATUS.md](STATUS.md).
