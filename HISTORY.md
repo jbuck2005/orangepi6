@@ -9,8 +9,8 @@ Kernel lines:
 | Line | Kernel | Where | State |
 |---|---|---|---|
 | 6.18.14 | kernel.org 6.18.14 + Sky1 patches (139) | `main` until PR #1 | released as **v2026.11.19**, superseded |
-| 6.18 LTS | kernel.org 6.18.64 + Sky1 patches, 5 rebased, 4 post patches | `main`, `KERNEL_TRACK=6.18` (default) | released as **v2026.11.19.1** (current default) |
-| Kernel 7 | kernel.org 7.3.5 + our forward port of Sky1 patches-next (55 patches) | `main`, `KERNEL_TRACK=7` (merged 2026-11-22; developed on branch `kernel-7`) | released as **v2026.11.22** (pre-release, optional) |
+| 6.18 LTS | kernel.org 6.18.64 + Sky1 patches, 5 rebased, 6 post patches | `main`, `KERNEL_TRACK=6.18` (default) | released as **v2026.11.19.1** (current default) |
+| Kernel 7 | kernel.org 7.3.5 + our forward port of Sky1 patches-next (56 patches) | `main`, `KERNEL_TRACK=7` (merged 2026-11-22; developed on branch `kernel-7`) | released as **v2026.11.22** (pre-release, optional) |
 
 ## Quick index of findings
 
@@ -30,6 +30,7 @@ Kernel lines:
 | Smart-plug workaround for lost NICs merged (needs RTC battery) | [2026-11-21](#2026-11-21-smart-plug-workaround-for-lost-nics-merged) |
 | Board draws ~17 W idle and 30-36 W under load at the wall | [2026-11-20](#2026-11-20-power-draw) |
 | Build-load crashes at 6000 MT/s track NVMe controller heat; an 8 h full-build run passes with a fan on the SSD | [2026-11-21](#2026-11-21-stability-at-6000-mts-nvme-heat) |
+| NPU works on an open stack (CIX driver 6.2.0, libaipudrv 4.1.0); no firmware needed | [2026-11-22](#2026-11-22-npu-phase-started-driver-updated-to-cix-620) |
 | Fuzzy patching misplaced an arm_scmi hunk into a NULL dereference | [2026-11-19](#2026-11-19-kernel-61864-lts) |
 
 ---
@@ -466,10 +467,60 @@ and `SHA256SUMS`, packaged from the board's native build of `kernel-7` at `0abe7
   longer use the board's local name.
 - The GitHub repository description now says "built on device".
 
+## 2026-11-22: NPU phase started, driver updated to CIX 6.2.0
+
+Research (no board changes):
+- The NPU is an Arm China Zhouyi X2 (architecture v3): ACPI device `CIXH4000`, 3 cores, behind the SMMU. Both of our
+  kernels already build the Sky1 series' `armchina-npu` driver, and it probes on the ACPI boot (`/dev/aipu`,
+  "ZHOUYI V3 AIPU", devfreq present).
+- **No firmware is needed.** None of the driver versions loads a firmware file; the compiled model graphs carry the
+  NPU code. The `armbian-firmware-full` hold doesn't matter for the NPU.
+- The Sky1 series' driver is an old CIX build (KMD 1.0.0). Its ioctl ABI (32 ASID bases in `struct aipu_cap`, no
+  `exec_id`, no DMA-buf bind) does not match current user space. Arm China's open user-mode library
+  ([Compass_NPU_Driver](https://github.com/Arm-China/Compass_NPU_Driver) `libaipudrv` 4.1.0, Apache-2.0) and CIX's
+  NOE 3.1.2 both expect the CIX 6.x driver. Arm China 4.2.0 and later changed the ABI again, so 4.1.0 is the
+  matching release.
+- CIX's 6.2.0 driver ([cix_opensource__npu_driver](https://github.com/cixtech/cix_opensource__npu_driver), branch
+  `cix_mainline_dev`, GPL-2.0) supports ACPI and is Arm China's 4.1.0 driver plus a Sky1 layer. The 4.1.0 library
+  with CIX's 6.2.0 driver is shown working on Sky1 under FreeBSD by
+  [JamesKane/aipu-umd](https://github.com/JamesKane/aipu-umd).
+- Models: precompiled `.cix` graphs from CIX's model hub on ModelScope. The compiler (CixBuilder/Compass) is closed
+  and x86-only, needed only for custom models. CIX's `libnoe` and ONNX Runtime provider are closed and optional.
+
+Change:
+- `patches/6.18.64/post/0012` and `patches/7.3/0056` (same driver on both tracks): replace the driver with CIX 6.2.0.
+  `sky1/sky1.c` is CIX's file with the Sky1 series' mainline changes kept (DVFS through the OPP core instead of the
+  SCMI genpd's private struct; under ACPI the `perf` domain attached by index). `v3_1` is replaced by `v3_2`
+  upstream. Compile-tested by cross-building the module against both patched trees (no errors; every undefined
+  symbol is exported). Not yet booted.
+- `scripts/npu-umd.sh`: builds Arm China's `libaipudrv` 4.1.0 (pinned commit `f35bac0`) natively and optionally
+  installs it to `/usr/local`. `-Werror` is dropped from its Makefile (newer g++ warns about hidden overloads).
+  Cross-built cleanly in the cloud.
+- `tools/npu-run.cpp`: `info` (driver versions, partitions, cores), `bench` (load a `.cix` or ELF graph, time N runs)
+  and `classify` (one float32 input, quantized with the graph's scale and zero point, top 5).
+- `tools/npu-prep.py`: image to the float32 NCHW input `classify` reads (ImageNet resize, crop, normalise).
+- First board test (7.3.5, module swap, no reboot): the 6.2.0 driver probes ("AIPU KMD (v6.2.0)", 1 partition,
+  1 cluster, 3 cores, 4 TECs each, custom per-ASID IOVA), `npu-run info` reports target `X2_1204MP3`, UMD 6.0.0,
+  KMD 6.2.0. CIX's MobileNetV2 graph (s8 in/out): **1.89 ms mean, 529 runs/s** over 200 runs. Every buffer free
+  failed at teardown ("V3: invalid PA ... for ASID 48"): `libaipudrv` 4.1.0 leaves `asid` unset in its free request
+  and the custom-IOVA path trusted it. Fixed in `0012`/`0056`: the ASID slots don't overlap, so the free takes the
+  ASID from the PA when the given one doesn't hold it.
+- Second board test (7.3.5, fixed patch): 0 UMD errors and no driver errors; MobileNetV2 1.84 ms mean, 542 runs/s;
+  3 of the 5 ImageNet validation images in the model's `test_data/` classify into one family each (snakes, birds, dogs).
+  The hub has no YOLO graphs.
+- Third board test, the default track: a full 6.18.64 build from `npu` (145 patches exact, `0012` added, 21 min at
+  `-j6`), staged from Armbian, one-shot boot. The driver loads at boot ("AIPU KMD (v6.2.0)", 3 cores); NICs up with
+  real MACs. MobileNetV2 1.58 ms mean, **631 runs/s**; the same top 5 as on 7.3.5; 0 library or driver errors.
+- `scripts/setup.sh npu` (optional step on the sky1 boot): checks the driver is 6.2.0, installs `libaipudrv`, installs
+  `npu-run`, prints `npu-run info`. `setup.sh check` reports the NPU driver version (warning only).
+- `docs/npu.md`, and the NPU in README, INSTALL and STATUS.
+- `bench/npu-bringup.sh`: test on a running sky1 kernel without a reboot: patch the driver into the existing build
+  tree, build and swap only the module, build the library and `npu-run`, fetch MobileNetV2 and YOLOv8n from the
+  model hub and benchmark them.
+
 ## Open items
 
-- NPU (phase 2): the in-tree `armchina` driver already probes on the sky1 ACPI boot. Leads:
-  visorcraft/orange-pi-6-plus-npu, Sky1-Linux/sky1-drivers-dkms.
+- NPU: boot the 6.2.0 driver, build `libaipudrv` 4.1.0 on the board, run hub models, then document and script it.
 - Kernel 7: confirm `0053` on a storming boot; more boots and a long load run on the released build; CIX display
   drivers; drop the debug patches `0050`/`0051`.
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.

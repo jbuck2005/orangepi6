@@ -88,6 +88,7 @@ rechargeable cell. Until one is fitted, set the memory speed and power-loss beha
 | vkmark (headless) | 3460-3544 (llvmpipe: 741) |
 | llama.cpp CPU, Qwen2.5-1.5B Q4_K_M | 124 tok/s prompt, 36.6 tok/s generation |
 | llama.cpp CPU, Qwen2.5-7B Q4_K_M | 33.7 / 8.75 tok/s |
+| NPU, CIX MobileNetV2 (s8) | 1.58 ms per run, 631 runs/s (`npu-run bench`, 6.18.64) |
 | Memory stability | firmware 2026-10-19: 0 ECC errors at 5500/6000/6400 MT/s; 1 h load at 6000 and 6400 on 6.18.64 |
 
 Details: [bench/MEMORY-AB-REPORT.md](bench/MEMORY-AB-REPORT.md) and [STATUS.md](STATUS.md).
@@ -119,9 +120,8 @@ boots (`SERIAL=1 scripts/install.sh arm acpi`) use `earlycon=pl011,mmio32,0x040d
 ## Roadmap
 - **Phase 1, GPU:** done (2026-11-18), released as v2026.11.19 and v2026.11.19.1.
 - **Kernel 7:** 7.3.5 merged as an optional track on 2026-11-22 and released as v2026.11.22 (pre-release).
-- **Phase 2, NPU:** next. The in-tree `armchina` driver already probes on the sky1 ACPI boot. Leads:
-  [visorcraft/orange-pi-6-plus-npu](https://github.com/visorcraft/orange-pi-6-plus-npu),
-  [Sky1-Linux/sky1-drivers-dkms](https://github.com/Sky1-Linux/sky1-drivers-dkms).
+- **Phase 2, NPU:** working on an open stack (CIX's 6.2.0 driver, Arm China's open `libaipudrv` 4.1.0), see
+  [docs/npu.md](docs/npu.md). Not in a release yet.
 - Ruled out: the CIX/Canonical vendor kernel and closed Mali stack, NCZ-OS, and the original Orange Pi vendor image
   (it didn't boot on this board). See [HISTORY.md](HISTORY.md).
 
@@ -139,13 +139,14 @@ change (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 | `scripts/gpu-test.sh` | vulkaninfo, glmark2 and vkmark, results to `/var/log/sky1-gpu-test.txt` |
 | `scripts/package-release.sh` | builds the release tarballs and `SHA256SUMS` |
 | `kernel.conf` | the two kernel tracks (`KERNEL_TRACK=6.18`, the default, or `7`): version and patch set used by every script |
-| `patches/6.18.64/` | rebased Sky1 patches; `post/` holds our fixes (syscore API, r8125 netpoll, AER storm) |
+| `patches/6.18.64/` | rebased Sky1 patches; `post/` holds our fixes (syscore API, r8125 netpoll, AER storm, NPU driver 6.2.0) |
 | `patches/7.3/` | kernel 7 track: the Sky1 patches forward-ported to 7.3.5, plus our fixes (`0044`-`0055`) |
-| `docs/` | kernel 7 notes and board results (`KERNEL-7.md`), the CPU scheduling fix, r8125 vs r8169 |
+| `docs/` | kernel 7 notes and board results (`KERNEL-7.md`), the CPU scheduling fix, r8125 vs r8169, the NPU (`npu.md`) |
 | `initramfs/`, `scripts/bootlog-area.sh` | early-boot logger: writes the kernel log to a raw disk area before root is mounted |
 | `dts/sky1-orangepi-6.dts` | non-Plus device tree (for the optional DT/`acpi=off` route) |
 | `bench/` | benchmark and memory-soak suite, Windows UART logger, A/B report |
-| `tools/` | netconsole listener and self-test; read-only smart-plug power report (`plug-power.py`) |
+| `tools/` | netconsole listener and self-test; read-only smart-plug power report (`plug-power.py`); `npu-run` and `npu-prep.py` |
+| `scripts/npu-umd.sh` | builds and installs Arm China's open NPU library (`libaipudrv` 4.1.0); `setup.sh npu` runs it |
 | `scripts/01-toolchain.sh` | unprivileged toolchain from Ubuntu debs (only needed without root; `setup.sh` uses apt instead) |
 
 ## How the fallback works
