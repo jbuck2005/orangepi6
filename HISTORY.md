@@ -580,8 +580,8 @@ Change:
   package (with the warning), stages 7.3.5 and makes it the default; installing the 6.18 package switches back the
   same way. Armbian stayed entry 0 throughout, `/lib/modules` ends with only Armbian's and 6.18.64-sky1, `dpkg --audit`
   is clean, and after a warm reboot `orangepi6-check` passes. dpkg runs the installed package's own prerm, so the
-  board's first (same-version) package had to be reinstalled first: `DEB_REV=<n>` now gives a repack of the same tag
-  a higher version.
+  board's first (same-version) package had to be reinstalled first. Versioning rule (James): the release tag is
+  the package's version suffix and the only increment, so changed packaging always ships under a new tag.
 - `docs/packages.md`; INSTALL points to it; README has a "Building for distribution" section with the full
   command sequence for the release assets, .deb packages included.
 

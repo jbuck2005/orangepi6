@@ -6,8 +6,8 @@
 #   orangepi6-npu_4.1.0-<rel>_arm64.deb          Arm China's open NPU library libaipudrv 4.1.0, headers, npu-run
 #
 # <rel> is the release tag without its "v" (v2026.11.22.1 -> 6.18.64-2026.11.22.1), so later releases upgrade earlier
-# ones. DEB_REV=<n> appends "+<n>" (6.18.64-2026.11.22.1+1) for a repack of the same tag with changed packaging, so
-# apt sees it as an upgrade (an installed package's own prerm/postrm run on upgrade and removal). The kernel packages install exactly like setup.sh: into /boot/sky1/ with a private initramfs, "Sky1 (acpi)"
+# ones. The tag is the only version increment: changed packaging ships under a new tag (v2026.11.22.1 -> v2026.11.22.2),
+# never as a rebuild of an old one, which apt would skip as "already the newest version". The kernel packages install exactly like setup.sh: into /boot/sky1/ with a private initramfs, "Sky1 (acpi)"
 # as the GRUB default and Armbian's kernel as entry 0 and the fallback (see docs/packages.md). They never touch
 # Armbian's kernel packages, so the Armbian holds stay as they are.
 #
@@ -55,7 +55,7 @@ kernel() {  # $1 = tree, $2 = tag, $3 = outdir
   for f in arch/arm64/boot/Image .config BUILDINFO; do [ -s "$T/$f" ] || die "$T/$f missing"; done
   [ -s "$DTB" ] || die "non-Plus DTB missing"
   [ -s "$M/modules.order" ] && [ -s "$M/modules.builtin" ] || die "$M: modules missing"
-  local P=orangepi6-kernel-$TRACK VER=$KV-${TAG#v}${DEB_REV:++$DEB_REV}
+  local P=orangepi6-kernel-$TRACK VER=$KV-${TAG#v}
   echo "== $P $VER"
   newtmp; local R=$NEWTMP
   # modules: /usr/lib/modules (= /lib/modules on usrmerged Ubuntu); depmod output is made by postinst
@@ -126,7 +126,7 @@ npu() {  # $1 = tag, $2 = outdir
   [ "$(uname -m)" = aarch64 ] || die "the NPU package is built natively on the board (arm64)"
   "$REPO/scripts/npu-umd.sh" > "$WORK/npu-umd.log" 2>&1 || { tail -20 "$WORK/npu-umd.log"; die "libaipudrv build failed"; }
   UMD_COMMIT=$(sed -n 's/^UMD_COMMIT=\([0-9a-f]*\).*/\1/p' "$REPO/scripts/npu-umd.sh")
-  local B=$WORK/npu-umd/build/lib U=$WORK/npu-umd/src/Linux/driver P=orangepi6-npu VER=4.1.0-${TAG#v}${DEB_REV:++$DEB_REV}
+  local B=$WORK/npu-umd/build/lib U=$WORK/npu-umd/src/Linux/driver P=orangepi6-npu VER=4.1.0-${TAG#v}
   echo "== $P $VER"
   newtmp; local R=$NEWTMP
   local LIB=$R/usr/lib/aarch64-linux-gnu INC=$R/usr/include/aipu
