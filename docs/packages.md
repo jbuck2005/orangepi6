@@ -27,7 +27,8 @@ npu-run info               # optional: the NPU
 packages, Mesa's Vulkan driver and its test tools. Check the files against the release's `SHA256SUMS` first
 (`sha256sum -c --ignore-missing SHA256SUMS`).
 
-To switch tracks, install the other kernel package; apt removes the first one. Reboot afterwards. To go back to
+To switch tracks, install the other kernel package, from either kernel; apt removes the first one and the new one
+becomes the default. Reboot afterwards. To go back to
 Armbian's kernel only, boot it and run `sudo apt remove orangepi6-kernel-6.18` (or `-7`).
 
 ## What the kernel package does
@@ -42,8 +43,9 @@ repo's scripts in `/usr/share/orangepi6`:
   boot never comes up. To install without changing the default, put `SKY1_MAKE_DEFAULT=no` in
   `/etc/default/orangepi6-kernel` first.
 
-Removing the package hands the default back to Armbian and empties `/boot/sky1`. It refuses to remove the kernel
-that is running (boot Armbian's kernel first, or set `SKY1_REMOVE_RUNNING=1`). Purging the last kernel package also
+Removing the package hands the default back to Armbian and empties `/boot/sky1`. Removing the kernel that is
+running works (that is how apt switches tracks), with a warning: reboot soon, since no module can be loaded until
+then. Purging the last kernel package also
 removes the boot logger and boot report.
 
 ### Why not `make bindeb-pkg`

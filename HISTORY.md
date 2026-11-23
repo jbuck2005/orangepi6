@@ -555,17 +555,23 @@ Change:
   `/usr/share/orangepi6`, so a package install is the same as `setup.sh`: `/boot/sky1`, private initramfs, every
   verify check, "Sky1 (acpi)" as the GRUB default with Armbian as entry 0 and the fallback. Not `make bindeb-pkg`,
   which installs into `/boot` and would bring back Armbian GRUB entries for the sky1 kernel. Removal hands the
-  default back to Armbian and refuses the running kernel. `orangepi6-check` runs `setup.sh check`.
+  default back to Armbian. `orangepi6-check` runs `setup.sh check`.
 - `install.sh`: `SKY1_PKG=1` mode for the postinst (modules already unpacked by dpkg, no build environment).
 - `package-release.sh` adds the kernel and NPU packages to each release and to `SHA256SUMS`.
 - `package-deb.sh from-release` repacks a published release tarball; the 6.18 and 7 packages for v2026.11.22.1 and
-  v2026.11.22 build this way (29 MB and 30 MB). Not yet installed on the board.
+  v2026.11.22 build this way (29 MB and 30 MB).
+- Board test (from Armbian 6.18.45, over a source-installed kernel): `apt install` of the 6.18 and NPU packages
+  passes stage, every verify check and default; Armbian stays entry 0. The warm reboot came up on 6.18.64-sky1 by
+  default, boot confirmed, NICs with their real MACs; `orangepi6-check` passes (panthor, panvk, Panfrost, NPU driver
+  6.2.0) and `npu-run info` reports X2_1204MP3, UMD 6.0.0, KMD 6.2.0. Installing the 7 package while running 6.18.64
+  failed: apt removes the old package with a plain `remove`, and the prerm refused the running kernel. The prerm now
+  warns instead (as Debian's kernel packages do), and the second verify run in the postinst is skipped.
 - `docs/packages.md`; INSTALL points to it.
 
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models; a 7.3.5 release with `0056`.
-- .deb packages: install, upgrade, track switch and removal tests on the board; attach them to the next release.
+- .deb packages: retest the track switch and removal on the board; attach them to the next release.
 - Kernel 7: more boots and a long load run on the released build; CIX display
   drivers; drop the debug patches `0050`/`0051`.
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.

@@ -16,7 +16,7 @@ case "$1" in
     # shellcheck disable=SC1091
     [ -f /etc/default/orangepi6-kernel ] && . /etc/default/orangepi6-kernel
     if [ "${SKY1_MAKE_DEFAULT:-yes}" = yes ]; then
-      run default
+      SKY1_VERIFIED=1 run default   # stage has just run every verify check
     else
       echo "orangepi6-kernel: SKY1_MAKE_DEFAULT=no, GRUB default left unchanged"
     fi

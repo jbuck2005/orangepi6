@@ -311,7 +311,9 @@ check_default_cfg() {  # $1 = grub.cfg
 }
 
 make_default() {
-  need_root; load_build; verify
+  need_root; load_build
+  # the package postinst runs stage (which ends with verify) right before this; don't run every check twice
+  [ "${SKY1_VERIFIED:-0}" = 1 ] || verify
   systemctl is-enabled -q sky1-boot-report.service || die "sky1-boot-report.service not enabled (it confirms boots)"
   grep -q 'sky1_pending=0' /usr/local/sbin/sky1-boot-report || die "installed boot report cannot confirm boots; run stage"
   local tmpcfg; tmpcfg=$(mktemp)
