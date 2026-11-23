@@ -545,6 +545,16 @@ Change:
   at 5.8 s, and then nothing: no spurious-interrupt or "disabling it" lines. So `0053` acks the bit and the storm
   never starts.
 
+## 2026-11-23: README brought up to date
+
+- README: a "What works" table (CPU/NICs, GPU, NPU, display); the NPU in the stack summary (CIX 6.2.0 driver,
+  `libaipudrv` 4.1.0, no firmware, hub models, closed compiler only for custom models); `setup.sh npu` in the quick
+  start; a releases table (v2026.11.22.1 Latest and the `--prebuilt` default, v2026.11.22 pre-release with the old
+  NPU driver); NVMe cooling and the NPU under hardware notes; NPU results for both kernels (631/s and 562/s); kernel 7
+  known issues updated after the 2026-11-22 boot (`0053` caught the condition once, no long run yet on the build with
+  `0056`); NPU model limits as a known issue; roadmap marks the NPU phase done.
+- `docs/npu.md`: status line and results table mention the 7.3.5 full build from `main`.
+
 ## 2026-11-23: .deb packages
 
 - `scripts/package-deb.sh`: the kernel as a Debian package per track, `orangepi6-kernel-6.18` (6.18.64-sky1) and
@@ -566,7 +576,8 @@ Change:
   6.2.0) and `npu-run info` reports X2_1204MP3, UMD 6.0.0, KMD 6.2.0. Installing the 7 package while running 6.18.64
   failed: apt removes the old package with a plain `remove`, and the prerm refused the running kernel. The prerm now
   warns instead (as Debian's kernel packages do), and the second verify run in the postinst is skipped.
-- `docs/packages.md`; INSTALL points to it.
+- `docs/packages.md`; INSTALL points to it; README has a "Building for distribution" section with the full
+  command sequence for the release assets, .deb packages included.
 
 ## Open items
 
