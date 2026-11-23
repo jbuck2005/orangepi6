@@ -62,7 +62,7 @@ The packages have their own names and never replace or depend on Armbian's kerne
 what `apt upgrade` does to Armbian's kernel. Keep Armbian's holds (`linux-image-current-arm64`,
 `linux-dtb-current-arm64`, `armbian-firmware-full`) as they are.
 
-Versions are `<kernel>-<release tag>-<revision>`, e.g. `6.18.64-2026.11.22.1-1`, so a later release's package
+Versions are `<kernel>-<release tag>-<revision>`, e.g. `6.18.64-2026.11.23-1`, so a later release's package
 upgrades an earlier one. An upgrade that keeps the same kernel release (a rebuild of 6.18.64) replaces the running kernel's modules:
 reboot right after it. The revision is 1 for the first build of a tag; a rebuild of the
 same tag with changed packaging takes `DEB_REVISION=2` (then 3, ...), so apt upgrades over the earlier build instead
@@ -74,7 +74,7 @@ of skipping it as "already the newest version".
 in `SHA256SUMS`. Separately:
 
 ```bash
-scripts/package-deb.sh from-release v2026.11.22.1        # the 6.18 kernel package, from a published release tarball
+scripts/package-deb.sh from-release v2026.11.23          # the 6.18 kernel package, from a published release tarball
 KERNEL_TRACK=7 scripts/package-deb.sh from-release v2026.11.22
 scripts/package-deb.sh kernel <tree> <tag>               # from a tree laid out like the release tarball
 scripts/package-deb.sh npu <tag>                         # builds libaipudrv and npu-run; on the board (arm64)

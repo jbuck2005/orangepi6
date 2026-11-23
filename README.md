@@ -64,12 +64,13 @@ For kernel 7.3.5 instead, put `KERNEL_TRACK=7` in front of the setup command:
 run `FORCE=1 KERNEL_TRACK=<6.18|7> scripts/setup.sh --prebuilt`. Only one sky1 kernel is installed at a time.
 
 ## Releases
-Each release has a prebuilt kernel, its exact patched source and `SHA256SUMS`. From the next release on, it also has the kernel and the NPU
+Each release has a prebuilt kernel, its exact patched source and `SHA256SUMS`. Since v2026.11.23 it also has the kernel and the NPU
 library as .deb packages (`sudo apt install ./orangepi6-kernel-6.18_*_arm64.deb`, see [docs/packages.md](docs/packages.md)).
 
 | Release | Kernel | NPU | State |
 |---|---|---|---|
-| [v2026.11.22.1](../../releases/tag/v2026.11.22.1) | 6.18.64 LTS | 6.2.0 driver | **Latest**, what `setup.sh --prebuilt` installs |
+| [v2026.11.23](../../releases/tag/v2026.11.23) | 6.18.64 LTS | 6.2.0 driver | **Latest**, what `setup.sh --prebuilt` installs; also as .deb packages |
+| [v2026.11.22.1](../../releases/tag/v2026.11.22.1) | 6.18.64 LTS | 6.2.0 driver | the same kernel, without packages |
 | [v2026.11.22](../../releases/tag/v2026.11.22) | 7.3.5 | old driver (`setup.sh npu` refuses it) | pre-release; build 7.3.5 from source for the NPU |
 | v2026.11.19.1, v2026.11.19 | 6.18.64, 6.18.14 | old driver | superseded |
 
@@ -82,7 +83,7 @@ scripts/setup.sh preflight && scripts/setup.sh packages && scripts/setup.sh sour
 #    for kernel 7 instead: KERNEL_TRACK=7 in front of each command
 
 # 2. package it: the prebuilt tarball, the patched source, the .deb packages and SHA256SUMS, into ~/sky1-build/release/
-scripts/package-release.sh v2026.11.22.1       # the release tag; NPU_DEB=0 skips the NPU package
+scripts/package-release.sh v2026.11.23         # the release tag; NPU_DEB=0 skips the NPU package
 ```
 
 `package-release.sh` checks that the shipped source is the one that was built, then calls `scripts/package-deb.sh`,
@@ -99,13 +100,13 @@ which writes:
 The packages can also be made on their own:
 
 ```bash
-scripts/package-deb.sh from-release v2026.11.22.1        # 6.18 kernel package from a published release tarball
+scripts/package-deb.sh from-release v2026.11.23          # 6.18 kernel package from a published release tarball
 KERNEL_TRACK=7 scripts/package-deb.sh from-release v2026.11.22
-scripts/package-deb.sh npu v2026.11.22.1                  # NPU package (on the board, arm64)
+scripts/package-deb.sh npu v2026.11.23                    # NPU package (on the board, arm64)
 sha256sum ~/sky1-build/release/*.deb
 ```
 
-Package versions are `<kernel>-<tag>-<rev>` (`6.18.64-2026.11.22.1-1`). `<rev>` is 1 for a tag's first build; a
+Package versions are `<kernel>-<tag>-<rev>` (`6.18.64-2026.11.23-1`). `<rev>` is 1 for a tag's first build; a
 rebuild of the same tag with changed packaging takes `DEB_REVISION=2`, 3, ... in front of the command, so `apt`
 upgrades over it. `from-release` only repacks the published tarball after checking it against the release's `SHA256SUMS`, so it runs
 on any Linux machine with `dpkg-deb`. What the packages do when installed: [docs/packages.md](docs/packages.md).
@@ -202,7 +203,7 @@ boots (`SERIAL=1 scripts/install.sh arm acpi`) use `earlycon=pl011,mmio32,0x040d
 ## Roadmap
 - **Phase 1, GPU:** done (2026-11-18), released as v2026.11.19 and v2026.11.19.1.
 - **Phase 2, NPU:** done (2026-11-22) on an open stack (CIX's 6.2.0 driver, Arm China's open `libaipudrv` 4.1.0),
-  see [docs/npu.md](docs/npu.md). Released in v2026.11.22.1 (6.18.64).
+  see [docs/npu.md](docs/npu.md). Released in v2026.11.22.1 and v2026.11.23 (6.18.64).
 - **Kernel 7:** 7.3.5 merged as an optional track on 2026-11-22 and released as v2026.11.22 (pre-release). Its CPU
   gap is fixed and it runs the NPU from source. Next: more boots, a long load run, and a release with `0056`, before
   it can become the default.
