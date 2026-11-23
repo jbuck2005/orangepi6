@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="660" height="400" viewBox="0 0 660 400" font-family="Helvetica, Arial, sans-serif" font-size="14">
+  <title>Where the DEBUG header is on the Orange Pi 6: just below the left network jack</title>
+  <rect width="660" height="400" fill="#ffffff"/>
+
+  <!-- board outline, rear edge at the top -->
+  <rect x="20" y="40" width="620" height="300" rx="14" fill="#2f5e9e" stroke="#1d3d68" stroke-width="2"/>
+  <circle cx="42" cy="62" r="7" fill="#ffffff" stroke="#c9a227" stroke-width="3"/>
+  <circle cx="618" cy="62" r="7" fill="#ffffff" stroke="#c9a227" stroke-width="3"/>
+  <circle cx="42" cy="318" r="7" fill="#ffffff" stroke="#c9a227" stroke-width="3"/>
+  <circle cx="618" cy="318" r="7" fill="#ffffff" stroke="#c9a227" stroke-width="3"/>
+  <text x="630" y="20" text-anchor="end" fill="#555" font-size="12">rear edge</text>
+
+  <!-- rear-edge connectors -->
+  <rect x="60" y="26" width="120" height="90" rx="3" fill="#c9ccd1" stroke="#6b7078"/>
+  <text x="120" y="66" text-anchor="middle" fill="#222" font-weight="bold">Left</text>
+  <text x="120" y="84" text-anchor="middle" fill="#222" font-weight="bold">RJ45</text>
+  <rect x="192" y="30" width="44" height="80" rx="3" fill="#c9ccd1" stroke="#6b7078"/>
+  <text x="214" y="75" text-anchor="middle" fill="#222" font-size="12">DP</text>
+  <rect x="248" y="30" width="70" height="80" rx="3" fill="#c9ccd1" stroke="#6b7078"/>
+  <text x="283" y="75" text-anchor="middle" fill="#222" font-size="12">USB</text>
+  <rect x="332" y="30" width="290" height="80" rx="3" fill="none" stroke="#c9ccd1" stroke-width="2" stroke-dasharray="6 5"/>
+  <text x="477" y="75" text-anchor="middle" fill="#e9ecef" font-size="12">other rear connectors</text>
+
+  <!-- DEBUG header just below the left jack -->
+  <circle cx="129" cy="142" r="26" fill="none" stroke="#ffd43b" stroke-width="3"/>
+  <rect x="115" y="128" width="28" height="28" rx="2" fill="#1e1e1e"/>
+  <rect x="119" y="132" width="7" height="7" fill="#d4a62a"/>
+  <rect x="132" y="132" width="7" height="7" fill="#d4a62a"/>
+  <rect x="119" y="145" width="7" height="7" fill="#d4a62a"/>
+  <rect x="132" y="145" width="7" height="7" fill="#d4a62a"/>
+
+  <!-- callout -->
+  <polyline points="155,150 230,195 250,195" fill="none" stroke="#ffd43b" stroke-width="2.5"/>
+  <text x="258" y="192" fill="#ffffff" font-weight="bold" font-size="16">DEBUG header (2x2, UART2)</text>
+  <text x="258" y="214" fill="#ffffff" font-size="13">just below the left network jack,</text>
+  <text x="258" y="232" fill="#ffffff" font-size="13">silkscreen "DEBUG"</text>
+
+  <text x="20" y="366" fill="#333" font-size="13">Board seen from above, rear edge at the top. Simplified, not to scale: only the connectors</text>
+  <text x="20" y="386" fill="#333" font-size="13">nearest the header are drawn. Pinout and wiring: see the pinout diagram.</text>
+</svg>
