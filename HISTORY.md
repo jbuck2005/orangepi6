@@ -616,6 +616,19 @@ Change:
   from-release v2026.11.22`.
 - README (releases table and examples), INSTALL, STATUS, `docs/npu.md` and `docs/packages.md` name the new release.
 
+## 2026-11-23: stability runs keep every iteration's logs
+
+- During the kernel 7 (7.3.5) overnight run, iteration 11's full build failed after 49 seconds (a normal full
+  build takes about 21 minutes). Every other build and every stress round passed, and the kernel logged no
+  errors. The run kept only the last 20 lines of the failure, ending in a `make` error after the DTB overlay steps,
+  because each iteration overwrote the build log, so the cause is not known.
+- `bench/stability.sh` now keeps everything: each iteration's `setup.sh` output, its `build.log` and `patch.log`
+  (with `FULL=1`) and its stress output go to `~/stability-logs/<start time>/iter<N>-*.log`, and nothing is
+  overwritten. The output is written there while it runs, so a hang or crash cannot lose it. `LOG_HOST=<ssh host>`
+  also copies the logs off the board every 30 seconds and after each step.
+- Its event lines go to the kernel log at level 3, so they also reach the serial console when the console
+  loglevel is the quiet default (4). The earlier lines, at the default level, never reached it.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models; a 7.3.5 release with `0056`.
