@@ -64,7 +64,8 @@ what `apt upgrade` does to Armbian's kernel. Keep Armbian's holds (`linux-image-
 
 Versions are `<kernel>-<release tag>`, e.g. `6.18.64-2026.11.22.1`, so a later release's package upgrades an earlier
 one. An upgrade that keeps the same kernel release (a rebuild of 6.18.64) replaces the running kernel's modules:
-reboot right after it.
+reboot right after it. A repack of the same tag with changed packaging needs `DEB_REV=<n>` (version
+`6.18.64-2026.11.22.1+1`), or `apt install --reinstall`, since apt skips a package whose version is already installed.
 
 ## Making the packages
 

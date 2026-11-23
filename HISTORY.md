@@ -576,13 +576,19 @@ Change:
   6.2.0) and `npu-run info` reports X2_1204MP3, UMD 6.0.0, KMD 6.2.0. Installing the 7 package while running 6.18.64
   failed: apt removes the old package with a plain `remove`, and the prerm refused the running kernel. The prerm now
   warns instead (as Debian's kernel packages do), and the second verify run in the postinst is skipped.
+- Retest on the board with the fixed packages: from 6.18.64-sky1, `apt install` of the 7 package removes the 6.18
+  package (with the warning), stages 7.3.5 and makes it the default; installing the 6.18 package switches back the
+  same way. Armbian stayed entry 0 throughout, `/lib/modules` ends with only Armbian's and 6.18.64-sky1, `dpkg --audit`
+  is clean, and after a warm reboot `orangepi6-check` passes. dpkg runs the installed package's own prerm, so the
+  board's first (same-version) package had to be reinstalled first: `DEB_REV=<n>` now gives a repack of the same tag
+  a higher version.
 - `docs/packages.md`; INSTALL points to it; README has a "Building for distribution" section with the full
   command sequence for the release assets, .deb packages included.
 
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models; a 7.3.5 release with `0056`.
-- .deb packages: retest the track switch and removal on the board; attach them to the next release.
+- .deb packages: attach them to the next release (`package-release.sh`).
 - Kernel 7: more boots and a long load run on the released build; CIX display
   drivers; drop the debug patches `0050`/`0051`.
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
