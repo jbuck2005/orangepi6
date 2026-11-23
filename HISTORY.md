@@ -545,9 +545,27 @@ Change:
   at 5.8 s, and then nothing: no spurious-interrupt or "disabling it" lines. So `0053` acks the bit and the storm
   never starts.
 
+## 2026-11-23: .deb packages
+
+- `scripts/package-deb.sh`: the kernel as a Debian package per track, `orangepi6-kernel-6.18` (6.18.64-sky1) and
+  `orangepi6-kernel-7` (7.3.5-sky1), which conflict with each other, and the NPU user library and `npu-run` as
+  `orangepi6-npu` (libaipudrv 4.1.0 in `/usr/lib/aarch64-linux-gnu`, headers in `/usr/include/aipu`). Versions are
+  `<kernel>-<tag>`, e.g. `6.18.64-2026.11.22.1`. The build script and `setup.sh --prebuilt` stay.
+- The kernel package's postinst runs `install.sh stage` and `default` from a copy of the scripts in
+  `/usr/share/orangepi6`, so a package install is the same as `setup.sh`: `/boot/sky1`, private initramfs, every
+  verify check, "Sky1 (acpi)" as the GRUB default with Armbian as entry 0 and the fallback. Not `make bindeb-pkg`,
+  which installs into `/boot` and would bring back Armbian GRUB entries for the sky1 kernel. Removal hands the
+  default back to Armbian and refuses the running kernel. `orangepi6-check` runs `setup.sh check`.
+- `install.sh`: `SKY1_PKG=1` mode for the postinst (modules already unpacked by dpkg, no build environment).
+- `package-release.sh` adds the kernel and NPU packages to each release and to `SHA256SUMS`.
+- `package-deb.sh from-release` repacks a published release tarball; the 6.18 and 7 packages for v2026.11.22.1 and
+  v2026.11.22 build this way (29 MB and 30 MB). Not yet installed on the board.
+- `docs/packages.md`; INSTALL points to it.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models; a 7.3.5 release with `0056`.
+- .deb packages: install, upgrade, track switch and removal tests on the board; attach them to the next release.
 - Kernel 7: more boots and a long load run on the released build; CIX display
   drivers; drop the debug patches `0050`/`0051`.
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.

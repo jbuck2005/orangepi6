@@ -1,0 +1,10 @@
+#!/bin/bash
+set -e
+if [ "$1" = configure ]; then
+  if [ -e /usr/local/lib/libaipudrv.so.6 ]; then
+    echo "orangepi6-npu: /usr/local/lib/libaipudrv.so.6 (from scripts/setup.sh npu) is also installed and is found first;"
+    echo "  remove /usr/local/lib/libaipudrv.so* and /usr/local/include/aipu to use only this package."
+  fi
+  echo "orangepi6-npu: needs a sky1 kernel with CIX's 6.2.0 NPU driver. Check with: npu-run info"
+fi
+exit 0

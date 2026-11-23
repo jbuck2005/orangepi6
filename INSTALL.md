@@ -63,6 +63,10 @@ Re-running it skips steps that are already done.
 Releases instead. It's built by exactly this process, and its SHA-256 is checked against the release's `SHA256SUMS`.
 That saves the hour. The matching patched kernel source is published next to it.
 
+**Prefer packages?** The same kernel (and the NPU library) also comes as `.deb` packages that install with
+`sudo apt install ./orangepi6-kernel-6.18_*_arm64.deb`, and upgrade and remove like any other package. See
+[docs/packages.md](docs/packages.md).
+
 Then:
 ```bash
 sudo reboot

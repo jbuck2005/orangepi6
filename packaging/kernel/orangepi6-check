@@ -1,0 +1,7 @@
+#!/bin/bash
+# After rebooting into the packaged sky1 kernel: confirm the boot, the GPU (panthor, panvk, Panfrost) and the
+# NPU driver version, and drop module trees of older sky1 releases. Same as `scripts/setup.sh check`.
+set -e
+KREL=$(cat /boot/sky1/kernel.release 2>/dev/null) || { echo "no sky1 kernel in /boot/sky1" >&2; exit 1; }
+case "$KREL" in 7.*) T=7 ;; *) T=6.18 ;; esac
+WORK=/usr/lib/orangepi6/$KREL KERNEL_TRACK=$T exec bash /usr/share/orangepi6/scripts/setup.sh check

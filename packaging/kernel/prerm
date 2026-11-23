@@ -1,0 +1,20 @@
+#!/bin/bash
+# orangepi6-kernel-@TRACK@ prerm: refuse to remove the running kernel (switching tracks is fine: the other
+# package replaces this one), and hand the boot back to Armbian before the files go.
+set -e
+KREL=@KREL@
+case "$1" in
+  remove)
+    if [ "$(uname -r)" = "$KREL" ] && [ "${2:-}" != in-favour ] && [ "${SKY1_REMOVE_RUNNING:-0}" != 1 ]; then
+      echo "orangepi6-kernel: $KREL is the running kernel. Boot Armbian's kernel first, or remove with" >&2
+      echo "  sudo SKY1_REMOVE_RUNNING=1 apt remove <package>" >&2
+      exit 1
+    fi
+    if [ "$(cat /boot/sky1/kernel.release 2>/dev/null)" = "$KREL" ]; then
+      bash /usr/share/orangepi6/scripts/install.sh undefault || echo "orangepi6-kernel: could not reset the GRUB default" >&2
+      bash /usr/share/orangepi6/scripts/install.sh disarm >/dev/null 2>&1 || true
+      rm -f /boot/sky1/vmlinuz /boot/sky1/initrd.img /boot/sky1/sky1-orangepi-6.dtb /boot/sky1/config /boot/sky1/kernel.release
+      rmdir /boot/sky1 2>/dev/null || true
+    fi ;;
+esac
+exit 0
