@@ -560,7 +560,7 @@ Change:
 - `scripts/package-deb.sh`: the kernel as a Debian package per track, `orangepi6-kernel-6.18` (6.18.64-sky1) and
   `orangepi6-kernel-7` (7.3.5-sky1), which conflict with each other, and the NPU user library and `npu-run` as
   `orangepi6-npu` (libaipudrv 4.1.0 in `/usr/lib/aarch64-linux-gnu`, headers in `/usr/include/aipu`). Versions are
-  `<kernel>-<tag>`, e.g. `6.18.64-2026.11.22.1`. The build script and `setup.sh --prebuilt` stay.
+  `<kernel>-<tag>-<revision>`, e.g. `6.18.64-2026.11.22.1-1`. The build script and `setup.sh --prebuilt` stay.
 - The kernel package's postinst runs `install.sh stage` and `default` from a copy of the scripts in
   `/usr/share/orangepi6`, so a package install is the same as `setup.sh`: `/boot/sky1`, private initramfs, every
   verify check, "Sky1 (acpi)" as the GRUB default with Armbian as entry 0 and the fallback. Not `make bindeb-pkg`,
@@ -580,8 +580,9 @@ Change:
   package (with the warning), stages 7.3.5 and makes it the default; installing the 6.18 package switches back the
   same way. Armbian stayed entry 0 throughout, `/lib/modules` ends with only Armbian's and 6.18.64-sky1, `dpkg --audit`
   is clean, and after a warm reboot `orangepi6-check` passes. dpkg runs the installed package's own prerm, so the
-  board's first (same-version) package had to be reinstalled first. Versioning rule (James): the release tag is
-  the package's version suffix and the only increment, so changed packaging always ships under a new tag.
+  board's first (same-version) package had to be reinstalled first. Versioning (James): every package version ends in the
+  release tag plus a Debian revision, `6.18.64-2026.11.22.1-1`; a rebuild of the same tag with changed packaging takes
+  `DEB_REVISION=2`, 3, ... and upgrades over the earlier build.
 - `docs/packages.md`; INSTALL points to it; README has a "Building for distribution" section with the full
   command sequence for the release assets, .deb packages included.
 

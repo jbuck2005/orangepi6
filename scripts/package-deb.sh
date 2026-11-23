@@ -5,9 +5,9 @@
 #   orangepi6-kernel-7_<KV>-<rel>_arm64.deb      kernel 7.3.5-sky1 (KERNEL_TRACK=7); conflicts with the 6.18 package
 #   orangepi6-npu_4.1.0-<rel>_arm64.deb          Arm China's open NPU library libaipudrv 4.1.0, headers, npu-run
 #
-# <rel> is the release tag without its "v" (v2026.11.22.1 -> 6.18.64-2026.11.22.1), so later releases upgrade earlier
-# ones. The tag is the only version increment: changed packaging ships under a new tag (v2026.11.22.1 -> v2026.11.22.2),
-# never as a rebuild of an old one, which apt would skip as "already the newest version". The kernel packages install exactly like setup.sh: into /boot/sky1/ with a private initramfs, "Sky1 (acpi)"
+# <rel> is the release tag without its "v" plus a Debian revision, -1 for the first build of a tag:
+# v2026.11.22.1 -> 6.18.64-2026.11.22.1-1. A new tag upgrades earlier ones; a rebuild of the same tag with changed
+# packaging takes DEB_REVISION=2, 3, ... so apt upgrades over the earlier build instead of skipping it. The kernel packages install exactly like setup.sh: into /boot/sky1/ with a private initramfs, "Sky1 (acpi)"
 # as the GRUB default and Armbian's kernel as entry 0 and the fallback (see docs/packages.md). They never touch
 # Armbian's kernel packages, so the Armbian holds stay as they are.
 #
@@ -24,6 +24,8 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 WORK=${WORK:-$HOME/sky1-build}
 MAINT="jbuck2005 <59450931+jbuck2005@users.noreply.github.com>"
 HOMEPAGE=https://github.com/jbuck2005/orangepi6
+REV=${DEB_REVISION:-1}
+[[ "$REV" =~ ^[1-9][0-9]*$ ]] || { echo "package-deb: DEB_REVISION must be a number (1, 2, ...)" >&2; exit 1; }
 die() { echo "package-deb: $*" >&2; exit 1; }
 TMPS=(); trap 'rm -rf "${TMPS[@]}"' EXIT
 newtmp() { NEWTMP=$(mktemp -d); TMPS+=("$NEWTMP"); }   # sets NEWTMP; removed on exit
@@ -55,7 +57,7 @@ kernel() {  # $1 = tree, $2 = tag, $3 = outdir
   for f in arch/arm64/boot/Image .config BUILDINFO; do [ -s "$T/$f" ] || die "$T/$f missing"; done
   [ -s "$DTB" ] || die "non-Plus DTB missing"
   [ -s "$M/modules.order" ] && [ -s "$M/modules.builtin" ] || die "$M: modules missing"
-  local P=orangepi6-kernel-$TRACK VER=$KV-${TAG#v}
+  local P=orangepi6-kernel-$TRACK VER=$KV-${TAG#v}-$REV
   echo "== $P $VER"
   newtmp; local R=$NEWTMP
   # modules: /usr/lib/modules (= /lib/modules on usrmerged Ubuntu); depmod output is made by postinst
@@ -126,7 +128,7 @@ npu() {  # $1 = tag, $2 = outdir
   [ "$(uname -m)" = aarch64 ] || die "the NPU package is built natively on the board (arm64)"
   "$REPO/scripts/npu-umd.sh" > "$WORK/npu-umd.log" 2>&1 || { tail -20 "$WORK/npu-umd.log"; die "libaipudrv build failed"; }
   UMD_COMMIT=$(sed -n 's/^UMD_COMMIT=\([0-9a-f]*\).*/\1/p' "$REPO/scripts/npu-umd.sh")
-  local B=$WORK/npu-umd/build/lib U=$WORK/npu-umd/src/Linux/driver P=orangepi6-npu VER=4.1.0-${TAG#v}
+  local B=$WORK/npu-umd/build/lib U=$WORK/npu-umd/src/Linux/driver P=orangepi6-npu VER=4.1.0-${TAG#v}-$REV
   echo "== $P $VER"
   newtmp; local R=$NEWTMP
   local LIB=$R/usr/lib/aarch64-linux-gnu INC=$R/usr/include/aipu

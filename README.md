@@ -92,8 +92,8 @@ which writes:
 |---|---|
 | `sky1-kernel-<release>-<tag>-arm64.tar.xz` | Image, non-Plus DTB, `.config`, modules (what `setup.sh --prebuilt` installs) |
 | `linux-<release>-<tag>-source.tar.xz` | the exact patched source that was built |
-| `orangepi6-kernel-6.18_<kernel>-<tag>_arm64.deb` (or `-7`) | the same kernel as a package for `apt install` |
-| `orangepi6-npu_4.1.0-<tag>_arm64.deb` | Arm China's open NPU library, headers and `npu-run`, built on the board |
+| `orangepi6-kernel-6.18_<kernel>-<tag>-<rev>_arm64.deb` (or `-7`) | the same kernel as a package for `apt install` |
+| `orangepi6-npu_4.1.0-<tag>-<rev>_arm64.deb` | Arm China's open NPU library, headers and `npu-run`, built on the board |
 | `SHA256SUMS` | checksums of all of the above |
 
 The packages can also be made on their own:
@@ -105,7 +105,9 @@ scripts/package-deb.sh npu v2026.11.22.1                  # NPU package (on the 
 sha256sum ~/sky1-build/release/*.deb
 ```
 
-`from-release` only repacks the published tarball after checking it against the release's `SHA256SUMS`, so it runs
+Package versions are `<kernel>-<tag>-<rev>` (`6.18.64-2026.11.22.1-1`). `<rev>` is 1 for a tag's first build; a
+rebuild of the same tag with changed packaging takes `DEB_REVISION=2`, 3, ... in front of the command, so `apt`
+upgrades over it. `from-release` only repacks the published tarball after checking it against the release's `SHA256SUMS`, so it runs
 on any Linux machine with `dpkg-deb`. What the packages do when installed: [docs/packages.md](docs/packages.md).
 
 ## Firmware and BIOS

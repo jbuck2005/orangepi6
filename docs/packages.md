@@ -62,11 +62,11 @@ The packages have their own names and never replace or depend on Armbian's kerne
 what `apt upgrade` does to Armbian's kernel. Keep Armbian's holds (`linux-image-current-arm64`,
 `linux-dtb-current-arm64`, `armbian-firmware-full`) as they are.
 
-Versions are `<kernel>-<release tag>`, e.g. `6.18.64-2026.11.22.1`, so a later release's package upgrades an earlier
-one. An upgrade that keeps the same kernel release (a rebuild of 6.18.64) replaces the running kernel's modules:
-reboot right after it. The release tag is the package's version suffix and the
-only increment: changed packaging gets a new tag (e.g. v2026.11.22.2), never a rebuild under an old one, which apt
-would skip as "already the newest version" (`apt install --reinstall` forces it for a local test).
+Versions are `<kernel>-<release tag>-<revision>`, e.g. `6.18.64-2026.11.22.1-1`, so a later release's package
+upgrades an earlier one. An upgrade that keeps the same kernel release (a rebuild of 6.18.64) replaces the running kernel's modules:
+reboot right after it. The revision is 1 for the first build of a tag; a rebuild of the
+same tag with changed packaging takes `DEB_REVISION=2` (then 3, ...), so apt upgrades over the earlier build instead
+of skipping it as "already the newest version".
 
 ## Making the packages
 
