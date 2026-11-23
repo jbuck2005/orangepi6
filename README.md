@@ -118,8 +118,8 @@ boots (`SERIAL=1 scripts/install.sh arm acpi`) use `earlycon=pl011,mmio32,0x040d
 `bench/serial-log.ps1` is a timestamping logger for Windows.
 
 <p>
-  <img src="docs/images/debug-header-location.svg" width="49%" alt="Board outline: the 2x2 DEBUG header is just below the left network jack on the rear edge">
-  <img src="docs/images/debug-header-pinout.svg" width="49%" alt="DEBUG header pinout: RX and TX on the row nearest the jack, GND on the far row; board TX to adapter RXD, board RX to adapter TXD, GND to GND, adapter VCC unconnected">
+  <img src="docs/images/debug-header-location.svg" width="600" alt="Orange Pi 6 top side to scale with all connectors: the 2x2 DEBUG header is just below the left network jack, beside the top of the 40-pin header">
+  <img src="docs/images/debug-header-pinout.svg" width="600" alt="DEBUG header pinout: RX and TX on the row nearest the jack, GND on the far row; board TX to adapter RXD, board RX to adapter TXD, GND to GND, adapter VCC unconnected">
 </p>
 
 ## Roadmap

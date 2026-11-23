@@ -547,8 +547,9 @@ Change:
 
 ## 2026-11-23: debug header diagrams
 
-- `docs/images/debug-header-location.svg`: a simplified board outline showing the 2x2 `DEBUG` header just below the
-  left network jack.
+- `docs/images/debug-header-location.svg`: the top side of the board drawn to scale (90 x 90 mm) with every
+  connector, and the 2x2 `DEBUG` header circled just below the left network jack. Positions are measured from Orange
+  Pi's published board photos; the underside connectors are listed in the caption.
 - `docs/images/debug-header-pinout.svg`: the header's pinout (RX and TX on the row nearest the jack, GND on the far
   row) and the wiring to a 3.3 V USB-serial adapter (TX and RX crossed, adapter VCC unconnected).
 - Both are drawn for this repository (no vendor images) and shown under "Debug serial console" in README and INSTALL.
