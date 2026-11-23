@@ -307,7 +307,8 @@ check_default_cfg() {  # $1 = grub.cfg
   grep -A4 "menuentry \"$DEFAULT_ENTRY\"" "$cfg" | grep -q 'save_env sky1_pending' || die "entry does not set sky1_pending"
   grep -A8 "menuentry \"$DEFAULT_ENTRY\"" "$cfg" | grep -q 'sky1test=default' || die "entry lacks sky1test=default"
   grep -A8 "menuentry \"$DEFAULT_ENTRY\"" "$cfg" | grep -q 'panic=10' || die "entry would not reboot on panic"
-  ok "grub.cfg: '$DEFAULT_ENTRY' is the default, Armbian is entry 0 and the fallback, syntax OK"
+  local which="generated grub.cfg"; [ "$cfg" = /boot/grub/grub.cfg ] && which="installed /boot/grub/grub.cfg"
+  ok "$which: '$DEFAULT_ENTRY' is the default, Armbian is entry 0 and the fallback, syntax OK"
 }
 
 make_default() {

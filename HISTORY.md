@@ -583,6 +583,10 @@ Change:
   board's first (same-version) package had to be reinstalled first. Versioning (James): every package version ends in the
   release tag plus a Debian revision, `6.18.64-2026.11.22.1-1`; a rebuild of the same tag with changed packaging takes
   `DEB_REVISION=2`, 3, ... and upgrades over the earlier build.
+- Retest with the revision: over the first test package, `apt install` of the `-1` 6.18 and NPU packages upgrades
+  ("2 upgraded"), then 6.18 -> 7 -> 6.18 switches without `--reinstall`; `dpkg --audit` clean, `orangepi6-check`
+  passes after a warm reboot. The GRUB check line printed twice is the generated and then the installed grub.cfg;
+  it now says which.
 - `docs/packages.md`; INSTALL points to it; README has a "Building for distribution" section with the full
   command sequence for the release assets, .deb packages included.
 
