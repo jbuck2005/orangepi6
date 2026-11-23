@@ -1,0 +1,7 @@
+Arm China Zhouyi NPU user-mode driver (libaipudrv 4.1.0, "standard API") and npu-run, for the CIX Sky1 NPU,
+packaged by https://github.com/jbuck2005/orangepi6
+
+libaipudrv and its headers: https://github.com/Arm-China/Compass_NPU_Driver, commit @UMD_COMMIT@,
+Copyright Arm Technology (China) Co., Ltd., licensed under the Apache License 2.0;
+see /usr/share/common-licenses/Apache-2.0.
+npu-run: tools/npu-run.cpp in https://github.com/jbuck2005/orangepi6.

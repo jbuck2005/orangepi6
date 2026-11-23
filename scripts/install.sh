@@ -9,6 +9,10 @@
 #   sudo                              scripts/install.sh prune      # after a passed check: drop older sky1 module trees
 #   sudo                              scripts/install.sh bootlog    # print the raw boot log written by the last test boot
 #
+# The .deb kernel packages (scripts/package-deb.sh) ship a copy of this script and run `stage` and `default` from
+# their postinst with SKY1_PKG=1: WORK then points at the package's files, and dpkg has already put the modules in
+# /lib/modules/<release>.
+#
 # Kernel, initrd and DTB live in /boot/sky1/, so Armbian's 10_linux never generates entries for them.
 # The GRUB snippet is 45_sky1 (after 10_linux), so entry 0, the default, stays Armbian.
 # The initramfs is built from a private confdir, /etc/sky1/initramfs-tools, which Armbian never uses.
@@ -39,9 +43,10 @@ load_build() {
   [ -n "$KREL" ] || die "empty kernel release"
   [ -f "$SRC/arch/arm64/boot/Image" ] || die "Image missing"
   [ -f "$SRC/arch/arm64/boot/dts/cix/$DTB_NAME" ] || die "$DTB_NAME missing"
-  [ "$SRC/arch/arm64/boot/Image" -nt "$SRC/.config" ] || die "Image older than .config; rebuild"
+  # A package's files carry the times dpkg gave them, so the freshness check only applies to build trees.
+  [ "${SKY1_PKG:-0}" = 1 ] || [ "$SRC/arch/arm64/boot/Image" -nt "$SRC/.config" ] || die "Image older than .config; rebuild"
   # shellcheck disable=SC1091
-  . "$WORK/env.sh"
+  [ "${SKY1_PKG:-0}" = 1 ] || . "$WORK/env.sh"
 }
 
 # Only for an r8125 build (NIC_DRIVER=r8125); the default r8169 reads the real MACs itself.
@@ -178,7 +183,10 @@ verify() {
 stage() {
   need_root; load_build
   echo "== stage $KREL"
-  if [ -d "$SRC/modinst/lib/modules/$KREL" ]; then
+  if [ "${SKY1_PKG:-0}" = 1 ]; then
+    # .deb package: dpkg owns /lib/modules/$KREL and has already unpacked it
+    [ -d "/lib/modules/$KREL/kernel" ] || die "/lib/modules/$KREL missing; the package did not unpack its modules"
+  elif [ -d "$SRC/modinst/lib/modules/$KREL" ]; then
     # prebuilt release (setup.sh --prebuilt): modules come ready-installed in modinst/
     rm -rf "/lib/modules/$KREL"
     cp -a "$SRC/modinst/lib/modules/$KREL" "/lib/modules/$KREL"
@@ -299,11 +307,14 @@ check_default_cfg() {  # $1 = grub.cfg
   grep -A4 "menuentry \"$DEFAULT_ENTRY\"" "$cfg" | grep -q 'save_env sky1_pending' || die "entry does not set sky1_pending"
   grep -A8 "menuentry \"$DEFAULT_ENTRY\"" "$cfg" | grep -q 'sky1test=default' || die "entry lacks sky1test=default"
   grep -A8 "menuentry \"$DEFAULT_ENTRY\"" "$cfg" | grep -q 'panic=10' || die "entry would not reboot on panic"
-  ok "grub.cfg: '$DEFAULT_ENTRY' is the default, Armbian is entry 0 and the fallback, syntax OK"
+  local which="generated grub.cfg"; [ "$cfg" = /boot/grub/grub.cfg ] && which="installed /boot/grub/grub.cfg"
+  ok "$which: '$DEFAULT_ENTRY' is the default, Armbian is entry 0 and the fallback, syntax OK"
 }
 
 make_default() {
-  need_root; load_build; verify
+  need_root; load_build
+  # the package postinst runs stage (which ends with verify) right before this; don't run every check twice
+  [ "${SKY1_VERIFIED:-0}" = 1 ] || verify
   systemctl is-enabled -q sky1-boot-report.service || die "sky1-boot-report.service not enabled (it confirms boots)"
   grep -q 'sky1_pending=0' /usr/local/sbin/sky1-boot-report || die "installed boot report cannot confirm boots; run stage"
   local tmpcfg; tmpcfg=$(mktemp)

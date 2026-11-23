@@ -1,0 +1,6 @@
+Linux kernel @KREL@ for the Orange Pi 6 (CIX Sky1), packaged by https://github.com/jbuck2005/orangepi6
+
+The kernel is kernel.org Linux @KV@ with the Sky1-Linux patches (https://github.com/Sky1-Linux/linux-sky1)
+and this repository's device tree and patches. It is licensed under the GNU General Public License, version 2;
+see /usr/share/common-licenses/GPL-2. The complete corresponding source is published next to this package on the
+release page (linux-@KREL@-<tag>-source.tar.xz), and BUILDINFO in this directory records the exact inputs.

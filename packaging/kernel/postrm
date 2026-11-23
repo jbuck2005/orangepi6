@@ -1,0 +1,21 @@
+#!/bin/bash
+# orangepi6-kernel-@TRACK@ postrm: drop the files depmod generated (dpkg doesn't own them).
+set -e
+KREL=@KREL@
+case "$1" in
+  remove|purge|upgrade)
+    for f in alias alias.bin builtin.alias.bin builtin.bin dep dep.bin devname softdep symbols symbols.bin weakdep; do
+      rm -f "/lib/modules/$KREL/modules.$f"
+    done
+    rmdir "/lib/modules/$KREL" 2>/dev/null || true ;;
+esac
+# On purge, with no sky1 kernel left, also remove what `install.sh stage` created (shared with source installs).
+if [ "$1" = purge ] && [ ! -f /boot/sky1/kernel.release ]; then
+  systemctl disable -q sky1-boot-report.service 2>/dev/null || true
+  rm -f /etc/systemd/system/sky1-boot-report.service /usr/local/sbin/sky1-boot-report /usr/sbin/sky1-bootlog \
+    /etc/sky1-bootlog.conf /var/lib/sky1/bootlog.bin
+  rm -rf /etc/sky1/initramfs-tools
+  rmdir /etc/sky1 /var/lib/sky1 2>/dev/null || true
+  systemctl daemon-reload 2>/dev/null || true
+fi
+exit 0
