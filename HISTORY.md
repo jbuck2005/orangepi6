@@ -563,9 +563,45 @@ Change:
   row) and the wiring to a 3.3 V USB-serial adapter (TX and RX crossed, adapter VCC unconnected).
 - Both are drawn for this repository (no vendor images) and shown under "Debug serial console" in README and INSTALL.
 
+## 2026-11-23: .deb packages
+
+- `scripts/package-deb.sh`: the kernel as a Debian package per track, `orangepi6-kernel-6.18` (6.18.64-sky1) and
+  `orangepi6-kernel-7` (7.3.5-sky1), which conflict with each other, and the NPU user library and `npu-run` as
+  `orangepi6-npu` (libaipudrv 4.1.0 in `/usr/lib/aarch64-linux-gnu`, headers in `/usr/include/aipu`). Versions are
+  `<kernel>-<tag>-<revision>`, e.g. `6.18.64-2026.11.22.1-1`. The build script and `setup.sh --prebuilt` stay.
+- The kernel package's postinst runs `install.sh stage` and `default` from a copy of the scripts in
+  `/usr/share/orangepi6`, so a package install is the same as `setup.sh`: `/boot/sky1`, private initramfs, every
+  verify check, "Sky1 (acpi)" as the GRUB default with Armbian as entry 0 and the fallback. Not `make bindeb-pkg`,
+  which installs into `/boot` and would bring back Armbian GRUB entries for the sky1 kernel. Removal hands the
+  default back to Armbian. `orangepi6-check` runs `setup.sh check`.
+- `install.sh`: `SKY1_PKG=1` mode for the postinst (modules already unpacked by dpkg, no build environment).
+- `package-release.sh` adds the kernel and NPU packages to each release and to `SHA256SUMS`.
+- `package-deb.sh from-release` repacks a published release tarball; the 6.18 and 7 packages for v2026.11.22.1 and
+  v2026.11.22 build this way (29 MB and 30 MB).
+- Board test (from Armbian 6.18.45, over a source-installed kernel): `apt install` of the 6.18 and NPU packages
+  passes stage, every verify check and default; Armbian stays entry 0. The warm reboot came up on 6.18.64-sky1 by
+  default, boot confirmed, NICs with their real MACs; `orangepi6-check` passes (panthor, panvk, Panfrost, NPU driver
+  6.2.0) and `npu-run info` reports X2_1204MP3, UMD 6.0.0, KMD 6.2.0. Installing the 7 package while running 6.18.64
+  failed: apt removes the old package with a plain `remove`, and the prerm refused the running kernel. The prerm now
+  warns instead (as Debian's kernel packages do), and the second verify run in the postinst is skipped.
+- Retest on the board with the fixed packages: from 6.18.64-sky1, `apt install` of the 7 package removes the 6.18
+  package (with the warning), stages 7.3.5 and makes it the default; installing the 6.18 package switches back the
+  same way. Armbian stayed entry 0 throughout, `/lib/modules` ends with only Armbian's and 6.18.64-sky1, `dpkg --audit`
+  is clean, and after a warm reboot `orangepi6-check` passes. dpkg runs the installed package's own prerm, so the
+  board's first (same-version) package had to be reinstalled first. Versioning (James): every package version ends in the
+  release tag plus a Debian revision, `6.18.64-2026.11.22.1-1`; a rebuild of the same tag with changed packaging takes
+  `DEB_REVISION=2`, 3, ... and upgrades over the earlier build.
+- Retest with the revision: over the first test package, `apt install` of the `-1` 6.18 and NPU packages upgrades
+  ("2 upgraded"), then 6.18 -> 7 -> 6.18 switches without `--reinstall`; `dpkg --audit` clean, `orangepi6-check`
+  passes after a warm reboot. The GRUB check line printed twice is the generated and then the installed grub.cfg;
+  it now says which.
+- `docs/packages.md`; INSTALL points to it; README has a "Building for distribution" section with the full
+  command sequence for the release assets, .deb packages included.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models; a 7.3.5 release with `0056`.
+- .deb packages: attach them to the next release (`package-release.sh`).
 - Kernel 7: more boots and a long load run on the released build; CIX display
   drivers; drop the debug patches `0050`/`0051`.
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.

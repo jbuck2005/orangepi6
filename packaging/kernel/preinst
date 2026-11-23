@@ -1,0 +1,15 @@
+#!/bin/bash
+# orangepi6-kernel-@TRACK@ preinst: only for the Orange Pi 6 (CIX Sky1) running Armbian with GRUB.
+set -e
+case "$1" in
+  install|upgrade)
+    if [ "${SKY1_FORCE:-0}" != 1 ]; then
+      if [ "$(cat /sys/class/dmi/id/board_name 2>/dev/null)" != "CIX Board" ]; then
+        echo "orangepi6-kernel: this is not a CIX Sky1 board (DMI board_name); refusing to install." >&2
+        echo "  (SKY1_FORCE=1 overrides this, for image builds in a chroot only.)" >&2
+        exit 1
+      fi
+      command -v grub-mkconfig >/dev/null || { echo "orangepi6-kernel: GRUB (grub-mkconfig) not found" >&2; exit 1; }
+    fi ;;
+esac
+exit 0

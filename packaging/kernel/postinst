@@ -1,0 +1,30 @@
+#!/bin/bash
+# orangepi6-kernel-@TRACK@ postinst: the same steps as `scripts/setup.sh stage` and `default`, run from the
+# package's copy of this repo's scripts (/usr/share/orangepi6). The kernel goes to /boot/sky1/ with its own
+# initramfs, and "Sky1 (acpi)" becomes the GRUB default; Armbian's kernel stays entry 0 and the automatic
+# fallback. Nothing of Armbian's (its kernel, /boot/vmlinuz-*, /etc/initramfs-tools, 10_linux) is changed.
+set -e
+KREL=@KREL@
+TRACK=@TRACK@
+run() { SKY1_PKG=1 WORK=/usr/lib/orangepi6/$KREL KERNEL_TRACK=$TRACK bash /usr/share/orangepi6/scripts/install.sh "$@"; }
+case "$1" in
+  configure)
+    depmod "$KREL"
+    run stage
+    # Set SKY1_MAKE_DEFAULT=no in /etc/default/orangepi6-kernel to install without changing the GRUB default
+    # (then boot it once with `sudo /usr/share/orangepi6/scripts/install.sh arm acpi`).
+    # shellcheck disable=SC1091
+    [ -f /etc/default/orangepi6-kernel ] && . /etc/default/orangepi6-kernel
+    if [ "${SKY1_MAKE_DEFAULT:-yes}" = yes ]; then
+      SKY1_VERIFIED=1 run default   # stage has just run every verify check
+    else
+      echo "orangepi6-kernel: SKY1_MAKE_DEFAULT=no, GRUB default left unchanged"
+    fi
+    echo
+    if [ "$(uname -r)" = "$KREL" ]; then
+      echo "orangepi6-kernel: the running kernel's modules were replaced. Reboot now, before loading any module."
+    fi
+    echo "orangepi6-kernel: $KREL installed. Reboot, then run: orangepi6-check"
+    ;;
+esac
+exit 0

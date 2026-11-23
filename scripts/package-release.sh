@@ -2,6 +2,8 @@
 # Package a finished build (setup.sh source+build) as release assets in $WORK/release/:
 #   sky1-kernel-<KREL>-<tag>-arm64.tar.xz   ready-to-run: Image, non-Plus DTB, .config, modules
 #   linux-<KREL>-<tag>-source.tar.xz        the exact patched source (kernel.org + Sky1 patches + our DTS + .config)
+#   orangepi6-kernel-<track>_<KV>-<rel>_arm64.deb   the same kernel as a .deb (scripts/package-deb.sh)
+#   orangepi6-npu_4.1.0-<rel>_arm64.deb    the open NPU library and npu-run as a .deb (NPU_DEB=0 skips it)
 #   SHA256SUMS
 # Usage: WORK=... scripts/package-release.sh <tag>      e.g. v2026.11.19
 set -euo pipefail
@@ -35,7 +37,11 @@ compiler: $(${CC%% *} --version | head -1)
 built: $(date -Is) on $(uname -r)
 EOF
 tar -C "$OUT/stage" -cJf "$OUT/sky1-kernel-$KREL-$TAG-arm64.tar.xz" "linux-$KV"
+
+echo "== .deb packages"
+"$REPO/scripts/package-deb.sh" kernel "$STAGE" "$TAG" "$OUT"
 rm -rf "$OUT/stage"
+if [ "${NPU_DEB:-1}" = 1 ]; then "$REPO/scripts/package-deb.sh" npu "$TAG" "$OUT"; fi
 
 echo "== patched source"
 P=$OUT/src; mkdir -p "$P"
@@ -54,5 +60,5 @@ done
 tar -C "$P" -cJf "$OUT/linux-$KREL-$TAG-source.tar.xz" "linux-$KV"
 rm -rf "$P"
 
-( cd "$OUT" && sha256sum ./*.tar.xz | sed 's| \./| |' > SHA256SUMS && cat SHA256SUMS )
+( cd "$OUT" && sha256sum ./*.tar.xz ./*.deb | sed 's| \./| |' > SHA256SUMS && cat SHA256SUMS )
 ls -la "$OUT"

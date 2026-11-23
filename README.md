@@ -64,13 +64,51 @@ For kernel 7.3.5 instead, put `KERNEL_TRACK=7` in front of the setup command:
 run `FORCE=1 KERNEL_TRACK=<6.18|7> scripts/setup.sh --prebuilt`. Only one sky1 kernel is installed at a time.
 
 ## Releases
-Each release has a prebuilt kernel, its exact patched source and `SHA256SUMS`.
+Each release has a prebuilt kernel, its exact patched source and `SHA256SUMS`. From the next release on, it also has the kernel and the NPU
+library as .deb packages (`sudo apt install ./orangepi6-kernel-6.18_*_arm64.deb`, see [docs/packages.md](docs/packages.md)).
 
 | Release | Kernel | NPU | State |
 |---|---|---|---|
 | [v2026.11.22.1](../../releases/tag/v2026.11.22.1) | 6.18.64 LTS | 6.2.0 driver | **Latest**, what `setup.sh --prebuilt` installs |
 | [v2026.11.22](../../releases/tag/v2026.11.22) | 7.3.5 | old driver (`setup.sh npu` refuses it) | pre-release; build 7.3.5 from source for the NPU |
 | v2026.11.19.1, v2026.11.19 | 6.18.64, 6.18.14 | old driver | superseded |
+
+## Building for distribution
+Every release asset is made on the board from a normal build, with these commands (nothing else goes into them):
+
+```bash
+# 1. build the kernel from source (kernel.org signature checked, strict patching), as in the quick start
+scripts/setup.sh preflight && scripts/setup.sh packages && scripts/setup.sh source && scripts/setup.sh build
+#    for kernel 7 instead: KERNEL_TRACK=7 in front of each command
+
+# 2. package it: the prebuilt tarball, the patched source, the .deb packages and SHA256SUMS, into ~/sky1-build/release/
+scripts/package-release.sh v2026.11.22.1       # the release tag; NPU_DEB=0 skips the NPU package
+```
+
+`package-release.sh` checks that the shipped source is the one that was built, then calls `scripts/package-deb.sh`,
+which writes:
+
+| File | What |
+|---|---|
+| `sky1-kernel-<release>-<tag>-arm64.tar.xz` | Image, non-Plus DTB, `.config`, modules (what `setup.sh --prebuilt` installs) |
+| `linux-<release>-<tag>-source.tar.xz` | the exact patched source that was built |
+| `orangepi6-kernel-6.18_<kernel>-<tag>-<rev>_arm64.deb` (or `-7`) | the same kernel as a package for `apt install` |
+| `orangepi6-npu_4.1.0-<tag>-<rev>_arm64.deb` | Arm China's open NPU library, headers and `npu-run`, built on the board |
+| `SHA256SUMS` | checksums of all of the above |
+
+The packages can also be made on their own:
+
+```bash
+scripts/package-deb.sh from-release v2026.11.22.1        # 6.18 kernel package from a published release tarball
+KERNEL_TRACK=7 scripts/package-deb.sh from-release v2026.11.22
+scripts/package-deb.sh npu v2026.11.22.1                  # NPU package (on the board, arm64)
+sha256sum ~/sky1-build/release/*.deb
+```
+
+Package versions are `<kernel>-<tag>-<rev>` (`6.18.64-2026.11.22.1-1`). `<rev>` is 1 for a tag's first build; a
+rebuild of the same tag with changed packaging takes `DEB_REVISION=2`, 3, ... in front of the command, so `apt`
+upgrades over it. `from-release` only repacks the published tarball after checking it against the release's `SHA256SUMS`, so it runs
+on any Linux machine with `dpkg-deb`. What the packages do when installed: [docs/packages.md](docs/packages.md).
 
 ## Firmware and BIOS
 Firmware setup opens with **Esc** (or **F2**) at power-on. Check the installed version there or from Linux with
@@ -185,7 +223,8 @@ change (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 | `scripts/install.sh` | `stage`, `verify`, `default`/`undefault`, one-time test boots (`arm acpi\|dt`, `disarm`), `bootlog`, `prune` |
 | `scripts/boot-report.sh` | confirms the default boot (clears GRUB's fallback mark); network fallback for test boots |
 | `scripts/gpu-test.sh` | vulkaninfo, glmark2 and vkmark, results to `/var/log/sky1-gpu-test.txt` |
-| `scripts/package-release.sh` | builds the release tarballs and `SHA256SUMS` |
+| `scripts/package-release.sh` | builds the release tarballs, the .deb packages and `SHA256SUMS` |
+| `scripts/package-deb.sh`, `packaging/` | the .deb packages: kernel per track and the NPU library ([docs/packages.md](docs/packages.md)) |
 | `kernel.conf` | the two kernel tracks (`KERNEL_TRACK=6.18`, the default, or `7`): version and patch set used by every script |
 | `patches/6.18.64/` | rebased Sky1 patches; `post/` holds our fixes (syscore API, r8125 netpoll, AER storm, NPU driver 6.2.0) |
 | `patches/7.3/` | kernel 7 track: the Sky1 patches forward-ported to 7.3.5, plus our fixes (`0044`-`0055`) |

@@ -1,0 +1,21 @@
+#!/bin/bash
+# orangepi6-kernel-@TRACK@ prerm: hand the boot back to Armbian before the files go. When the other track's
+# package replaces this one, its postinst then makes itself the default.
+set -e
+KREL=@KREL@
+case "$1" in
+  remove)
+    # Removing the running kernel is allowed (apt removes it this way when the other track's package replaces
+    # it), as Debian's own kernel packages allow it: the system keeps running, but can't load modules until it
+    # reboots, and the next boot is the new sky1 kernel, or Armbian's if none is installed.
+    if [ "$(uname -r)" = "$KREL" ]; then
+      echo "orangepi6-kernel: removing the running kernel $KREL. Reboot soon; until then modules can't be loaded." >&2
+    fi
+    if [ "$(cat /boot/sky1/kernel.release 2>/dev/null)" = "$KREL" ]; then
+      bash /usr/share/orangepi6/scripts/install.sh undefault || echo "orangepi6-kernel: could not reset the GRUB default" >&2
+      bash /usr/share/orangepi6/scripts/install.sh disarm >/dev/null 2>&1 || true
+      rm -f /boot/sky1/vmlinuz /boot/sky1/initrd.img /boot/sky1/sky1-orangepi-6.dtb /boot/sky1/config /boot/sky1/kernel.release
+      rmdir /boot/sky1 2>/dev/null || true
+    fi ;;
+esac
+exit 0
