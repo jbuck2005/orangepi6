@@ -1,7 +1,16 @@
 # orangepi6
 
 An open, low-effort Linux install for the **Orange Pi 6** (standard, non-Plus: 90x90 mm board, CIX P1 / CD8180,
-Mali-G720, 2x RTL8125), on stock Armbian with a mainline-based kernel and fully open GPU drivers.
+Mali-G720, Zhouyi X2 NPU, 2x RTL8125), on stock Armbian with a mainline-based kernel and open GPU and NPU drivers.
+One script takes a fresh Armbian install to a working GPU, NPU and network in about 15 minutes of hands-on time.
+
+## What works
+| | State | How |
+|---|---|---|
+| CPU, memory, NVMe, both 2.5 GbE ports | working | sky1 kernel, mainline `r8169` for the NICs |
+| GPU (Mali-G720) | working, open | mainline `panthor` + Mesa (panvk Vulkan 1.4, Panfrost GLES 3.1) |
+| NPU (Zhouyi X2, 3 cores) | working, open | CIX's 6.2.0 driver + Arm China's `libaipudrv` 4.1.0, installed with `setup.sh npu` |
+| Display output | not tested | the board runs headless; on kernel 7 the CIX display drivers are off |
 
 - **Base OS:** stock Armbian generic **UEFI arm64** image (Ubuntu 26.04 "resolute" userspace) on an NVMe SSD.
 - **Kernel:** Linux **6.18.64** (6.18 LTS) from kernel.org plus the
@@ -10,12 +19,16 @@ Mali-G720, 2x RTL8125), on stock Armbian with a mainline-based kernel and fully 
   firmware's **ACPI** mode. The version is set in [kernel.conf](kernel.conf). This is the default.
 - **Kernel 7 (optional):** Linux **7.3.5** from kernel.org with this repo's forward port of the Sky1 patches
   ([patches/7.3/](patches/7.3/), [docs/KERNEL-7.md](docs/KERNEL-7.md)). Install it with `KERNEL_TRACK=7`. It matches
-  6.18.64 on the GPU and on the CPU, but it has had far less testing; see [Known issues](#known-issues).
+  6.18.64 on the GPU and on the CPU, and a build from `main` runs the NPU, but it has had far less testing; see
+  [Known issues](#known-issues).
 - **GPU:** mainline **panthor**, with Mesa from Ubuntu 26.04: **panvk** (Vulkan 1.4) and **Panfrost** (GLES 3.1).
   No CIX vendor kernel and no closed Mali (`mali_kbase` / `libmali`) stack.
+- **NPU:** CIX's open **6.2.0** `armchina-npu` driver (replacing the old one in the Sky1 series, on both kernels) and
+  Arm China's open user library **`libaipudrv` 4.1.0**. No firmware is needed. Models are precompiled `.cix` graphs
+  from CIX's model hub; the model compiler is closed and x86-only, and only needed for your own models.
+  See [docs/npu.md](docs/npu.md).
 - **Safe by default:** Armbian's own kernel stays installed as GRUB entry 0 and as an automatic fallback.
-- **Releases:** [v2026.11.22.1](../../releases/tag/v2026.11.22.1) (6.18.64 LTS with the NPU driver, the default) and
-  [v2026.11.22](../../releases/tag/v2026.11.22) (7.3.5, pre-release, old NPU driver). Each has a prebuilt kernel and its exact source.
+- **Releases:** see [below](#releases); `setup.sh --prebuilt` installs the latest one.
 
 This repo is for the **standard Orange Pi 6 only**. Don't use the Plus device tree (`sky1-orangepi-6-plus.dtb`) on it.
 
@@ -31,17 +44,33 @@ The full guide, with every firmware step, is [INSTALL.md](INSTALL.md). In short:
    git clone https://github.com/jbuck2005/orangepi6 && cd orangepi6
    scripts/setup.sh --prebuilt     # or scripts/setup.sh to build from source (20-60 min on the board)
    sudo reboot
-   scripts/setup.sh check          # panthor, /dev/dri/renderD128, Vulkan = panvk, GLES = Panfrost
+   scripts/setup.sh check          # panthor, /dev/dri/renderD128, Vulkan = panvk, GLES = Panfrost, NPU driver
+   scripts/setup.sh npu            # optional: NPU library and npu-run (built on the board)
    ```
 
 Hands-on time is about 15 minutes. `--prebuilt` downloads the release kernel and checks it against the release's
 `SHA256SUMS`; the source path fetches kernel.org 6.18.64, checks its signature, patches it strictly (no fuzz) and
 builds it on the board. Either way the kernel goes into `/boot/sky1/` and every step is verified (`install.sh verify`).
 
+`setup.sh npu` runs on the sky1 boot: it checks that the NPU driver is 6.2.0, builds and installs `libaipudrv` into
+`/usr/local`, installs `npu-run` and prints what the NPU reports (target `X2_1204MP3`, 3 cores). Then fetch a model
+from the hub and try it, for example `npu-run bench mobilenet_v2.cix 200`; the commands are in
+[docs/npu.md](docs/npu.md#running-a-model).
+
 For kernel 7.3.5 instead, put `KERNEL_TRACK=7` in front of the setup command:
-`KERNEL_TRACK=7 scripts/setup.sh --prebuilt` (or without `--prebuilt` to build it). The choice is remembered, so
+`KERNEL_TRACK=7 scripts/setup.sh` builds it from source (needed for the NPU on 7.3.5);
+`KERNEL_TRACK=7 scripts/setup.sh --prebuilt` installs the v2026.11.22 pre-release, which has the old NPU driver. The choice is remembered, so
 `scripts/setup.sh check` needs no prefix. To switch an installed board between 6.18 and 7, boot Armbian's kernel and
 run `FORCE=1 KERNEL_TRACK=<6.18|7> scripts/setup.sh --prebuilt`. Only one sky1 kernel is installed at a time.
+
+## Releases
+Each release has a prebuilt kernel, its exact patched source and `SHA256SUMS`.
+
+| Release | Kernel | NPU | State |
+|---|---|---|---|
+| [v2026.11.22.1](../../releases/tag/v2026.11.22.1) | 6.18.64 LTS | 6.2.0 driver | **Latest**, what `setup.sh --prebuilt` installs |
+| [v2026.11.22](../../releases/tag/v2026.11.22) | 7.3.5 | old driver (`setup.sh npu` refuses it) | pre-release; build 7.3.5 from source for the NPU |
+| v2026.11.19.1, v2026.11.19 | 6.18.64, 6.18.14 | old driver | superseded |
 
 ## Firmware and BIOS
 Firmware setup opens with **Esc** (or **F2**) at power-on. Check the installed version there or from Linux with
@@ -76,6 +105,10 @@ rechargeable cell. Until one is fitted, set the memory speed and power-loss beha
 - **NVMe / PCIe:** the Sky1 PCIe driver could hit an **AER interrupt storm** on the NVMe root port (`sky1-pcie.2`)
   right after PHY bring-up, which caused silent resets under load. `post/0003` and `post/0004` fix it (spurious
   interrupts return `IRQ_NONE`, the line is disabled after 64 in a row, and latched local errors are cleared).
+- **Cool the NVMe SSD.** The M.2 slot gets no airflow on a bare board. The controller of a heatsink-less SSD reached
+  97-100 C during full kernel builds on our board, and that is when we saw a hang and a panic. With a small fan on the
+  SSD, an 8.4 h run of 15 full builds and 14 `stress-ng` rounds at 6000 MT/s passed. Fit an M.2 heatsink or airflow.
+- **NPU:** Arm China Zhouyi X2 (architecture v3), ACPI device `CIXH4000`, 3 cores behind the SMMU, `/dev/aipu`.
 - **Power draw at the wall** (including the supply): ~1 W off, ~17 W idle, 30-36 W under build or stress load.
 - **Power supply:** the official 20 V USB-C PD supply (the BIOS manual recommends 100 W).
 
@@ -88,10 +121,11 @@ rechargeable cell. Until one is fitted, set the memory speed and power-loss beha
 | vkmark (headless) | 3460-3544 (llvmpipe: 741) |
 | llama.cpp CPU, Qwen2.5-1.5B Q4_K_M | 124 tok/s prompt, 36.6 tok/s generation |
 | llama.cpp CPU, Qwen2.5-7B Q4_K_M | 33.7 / 8.75 tok/s |
-| NPU, CIX MobileNetV2 (s8) | 1.58 ms per run, 631 runs/s (`npu-run bench`, 6.18.64) |
+| NPU, CIX MobileNetV2 (s8), 6.18.64 | 1.58 ms per run, **631 runs/s** (`npu-run bench`, 200 runs) |
+| NPU, CIX MobileNetV2 (s8), 7.3.5 | 1.78 ms per run, 562 runs/s |
 | Memory stability | firmware 2026-10-19: 0 ECC errors at 5500/6000/6400 MT/s; 1 h load at 6000 and 6400 on 6.18.64 |
 
-Details: [bench/MEMORY-AB-REPORT.md](bench/MEMORY-AB-REPORT.md) and [STATUS.md](STATUS.md).
+Details: [bench/MEMORY-AB-REPORT.md](bench/MEMORY-AB-REPORT.md), [docs/npu.md](docs/npu.md) and [STATUS.md](STATUS.md).
 
 ## Known issues
 - **Network ports missing after a warm reboot (fixed):** with Realtek's `r8125` driver, every warm reboot from the
@@ -101,11 +135,16 @@ Details: [bench/MEMORY-AB-REPORT.md](bench/MEMORY-AB-REPORT.md) and [STATUS.md](
 - **LLMs on the GPU:** llama.cpp on panvk is slow (~1.7 tok/s) and prompt processing fails with
   `ErrorOutOfDeviceMemory`. Use the CPU (`-dev none` in a Vulkan build).
 - **panvk** is not yet a conformant Vulkan driver, and the GPU temperature sensors don't read.
+- **NPU models:** only precompiled graphs from CIX's model hub run without the closed x86 compiler, and the hub has
+  no YOLO graphs. Classification has been checked for consistency (same top 5 on both kernels), not yet against
+  ImageNet ground truth. CIX's closed `libnoe` and ONNX Runtime provider are not used or shipped.
 - **Kernel 7 (7.3.5) is optional and less tested than 6.18.64.** GPU and CPU performance match 6.18.64 (the CPU
   scheduling gap is fixed by `0055`, see [docs/kernel7-cpu-scheduling.md](docs/kernel7-cpu-scheduling.md)), but:
-  - the final build has been booted once; earlier builds of the same track passed a 1 h load test;
-  - the fix for the PCIe AER interrupt storm on 7.x (`0053`) has been quiet on every boot since, but no boot has yet
-    shown the storm it was written for;
+  - the current build (with the NPU driver `0056`) has been booted once; earlier builds of the same track passed a
+    1 h load test, but there has been no long load run on this one yet;
+  - the fix for the PCIe AER interrupt storm on 7.x (`0053`) has now caught the condition once on the board (the
+    latched bit was cleared and no storm followed), so it is looking good but has little mileage;
+  - the v2026.11.22 pre-release predates the NPU driver update; build from source for the NPU;
   - the CIX display drivers do not build on 7.x and are off (the board runs headless; the GPU is unaffected);
   - two debug patches (`0050`, `0051`) are still in the series: they add a few log lines on each reboot and a
     register dump if an AER line is ever cut off.
@@ -119,9 +158,13 @@ boots (`SERIAL=1 scripts/install.sh arm acpi`) use `earlycon=pl011,mmio32,0x040d
 
 ## Roadmap
 - **Phase 1, GPU:** done (2026-11-18), released as v2026.11.19 and v2026.11.19.1.
-- **Kernel 7:** 7.3.5 merged as an optional track on 2026-11-22 and released as v2026.11.22 (pre-release).
-- **Phase 2, NPU:** working on an open stack (CIX's 6.2.0 driver, Arm China's open `libaipudrv` 4.1.0), see
-  [docs/npu.md](docs/npu.md). Released in v2026.11.22.1 (6.18.64).
+- **Phase 2, NPU:** done (2026-11-22) on an open stack (CIX's 6.2.0 driver, Arm China's open `libaipudrv` 4.1.0),
+  see [docs/npu.md](docs/npu.md). Released in v2026.11.22.1 (6.18.64).
+- **Kernel 7:** 7.3.5 merged as an optional track on 2026-11-22 and released as v2026.11.22 (pre-release). Its CPU
+  gap is fixed and it runs the NPU from source. Next: more boots, a long load run, and a release with `0056`, before
+  it can become the default.
+- **Open:** NPU classification checked against ImageNet labels and more hub models; CIX display drivers on 7.x; an
+  RTC battery. The full list is at the end of [HISTORY.md](HISTORY.md#open-items).
 - Ruled out: the CIX/Canonical vendor kernel and closed Mali stack, NCZ-OS, and the original Orange Pi vendor image
   (it didn't boot on this board). See [HISTORY.md](HISTORY.md).
 
