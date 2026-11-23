@@ -555,6 +555,14 @@ Change:
   `0056`); NPU model limits as a known issue; roadmap marks the NPU phase done.
 - `docs/npu.md`: status line and results table mention the 7.3.5 full build from `main`.
 
+## 2026-11-23: debug header diagrams
+
+- `docs/images/debug-header-location.svg`: a simplified board outline showing the 2x2 `DEBUG` header just below the
+  left network jack.
+- `docs/images/debug-header-pinout.svg`: the header's pinout (RX and TX on the row nearest the jack, GND on the far
+  row) and the wiring to a 3.3 V USB-serial adapter (TX and RX crossed, adapter VCC unconnected).
+- Both are drawn for this repository (no vendor images) and shown under "Debug serial console" in README and INSTALL.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models; a 7.3.5 release with `0056`.

@@ -156,6 +156,11 @@ unconnected. The firmware, GRUB and the sky1 kernel all log there. The firmware 
 boots (`SERIAL=1 scripts/install.sh arm acpi`) use `earlycon=pl011,mmio32,0x040d0000`.
 `bench/serial-log.ps1` is a timestamping logger for Windows.
 
+<p>
+  <img src="docs/images/debug-header-location.svg" width="49%" alt="Board outline: the 2x2 DEBUG header is just below the left network jack on the rear edge">
+  <img src="docs/images/debug-header-pinout.svg" width="49%" alt="DEBUG header pinout: RX and TX on the row nearest the jack, GND on the far row; board TX to adapter RXD, board RX to adapter TXD, GND to GND, adapter VCC unconnected">
+</p>
+
 ## Roadmap
 - **Phase 1, GPU:** done (2026-11-18), released as v2026.11.19 and v2026.11.19.1.
 - **Phase 2, NPU:** done (2026-11-22) on an open stack (CIX's 6.2.0 driver, Arm China's open `libaipudrv` 4.1.0),
