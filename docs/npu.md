@@ -1,6 +1,6 @@
 # NPU (Arm China Zhouyi X2) on the Orange Pi 6
 
-Status: **working** (2026-11-22) on 6.18.64 (full build, loads at boot) and 7.3.5 (module swap without a reboot).
+Status: **working** (2026-11-22) on 6.18.64 and 7.3.5 (full builds from `main`, the driver loads at boot).
 Released in **v2026.11.22.1** (6.18.64). The 7.3.5 pre-release v2026.11.22 and earlier releases have the old driver;
 build 7.3.5 from source for the NPU.
 
@@ -76,7 +76,7 @@ runs the library build and the model tests.
 
 Memory at 6000 MT/s, CIX's MobileNetV2 graph (s8 input 1x3x224x224, s8 output 1000), 200 runs (input copy + run):
 
-| | 6.18.64-sky1 (full build, boot) | 7.3.5-sky1 (module swap) |
+| | 6.18.64-sky1 (full build, boot) | 7.3.5-sky1 (module swap; a later full build from `main`: 1.78 ms, 562/s) |
 |---|---|---|
 | Graph load and job creation | 3.7 ms | 4.0-4.5 ms |
 | Inference mean / p50 | 1.58 / 1.57 ms | 1.84 / 1.89 ms |

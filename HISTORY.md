@@ -545,6 +545,16 @@ Change:
   at 5.8 s, and then nothing: no spurious-interrupt or "disabling it" lines. So `0053` acks the bit and the storm
   never starts.
 
+## 2026-11-23: README brought up to date
+
+- README: a "What works" table (CPU/NICs, GPU, NPU, display); the NPU in the stack summary (CIX 6.2.0 driver,
+  `libaipudrv` 4.1.0, no firmware, hub models, closed compiler only for custom models); `setup.sh npu` in the quick
+  start; a releases table (v2026.11.22.1 Latest and the `--prebuilt` default, v2026.11.22 pre-release with the old
+  NPU driver); NVMe cooling and the NPU under hardware notes; NPU results for both kernels (631/s and 562/s); kernel 7
+  known issues updated after the 2026-11-22 boot (`0053` caught the condition once, no long run yet on the build with
+  `0056`); NPU model limits as a known issue; roadmap marks the NPU phase done.
+- `docs/npu.md`: status line and results table mention the 7.3.5 full build from `main`.
+
 ## 2026-11-23: debug header diagrams
 
 - `docs/images/debug-header-location.svg`: a simplified board outline showing the 2x2 `DEBUG` header just below the
