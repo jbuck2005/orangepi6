@@ -141,5 +141,10 @@ board TX, and leave the adapter's VCC unconnected. The firmware, GRUB and the sk
 `scripts/install.sh arm acpi` with `SERIAL=1` arms a one-time test boot that keeps all output on the serial console.
 `bench/serial-log.ps1` is a timestamping logger for Windows.
 
+<p>
+  <img src="docs/images/debug-header-location.svg" width="49%" alt="Board outline: the 2x2 DEBUG header is just below the left network jack on the rear edge">
+  <img src="docs/images/debug-header-pinout.svg" width="49%" alt="DEBUG header pinout: RX and TX on the row nearest the jack, GND on the far row; board TX to adapter RXD, board RX to adapter TXD, GND to GND, adapter VCC unconnected">
+</p>
+
 ## Benchmarks
 `bench/` holds the A/B suite (`ab-test.sh`), the combined soak (`soak.sh`) and the results from our board.

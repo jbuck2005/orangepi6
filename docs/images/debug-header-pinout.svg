@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="660" height="330" viewBox="0 0 660 330" font-family="Helvetica, Arial, sans-serif" font-size="14">
+  <title>Orange Pi 6 DEBUG header (UART2) pinout and wiring to a 3.3 V USB-serial adapter</title>
+  <rect width="660" height="330" fill="#ffffff"/>
+
+  <!-- left network jack (top of drawing = rear edge of the board) -->
+  <rect x="40" y="18" width="220" height="62" rx="4" fill="#c9ccd1" stroke="#6b7078"/>
+  <text x="150" y="54" text-anchor="middle" fill="#222">Left network jack (RJ45)</text>
+
+  <!-- 2x2 header -->
+  <rect x="90" y="105" width="120" height="112" rx="4" fill="#1e1e1e"/>
+  <rect x="111" y="121" width="18" height="18" fill="#d4a62a"/>
+  <rect x="171" y="121" width="18" height="18" fill="#d4a62a"/>
+  <rect x="111" y="171" width="18" height="18" fill="#d4a62a"/>
+  <rect x="171" y="171" width="18" height="18" fill="#d4a62a"/>
+  <text x="120" y="157" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">RX</text>
+  <text x="180" y="157" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">TX</text>
+  <text x="120" y="207" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">GND</text>
+  <text x="180" y="207" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">GND</text>
+  <text x="150" y="238" text-anchor="middle" fill="#222" font-weight="bold">DEBUG (UART2)</text>
+  <text x="80" y="135" text-anchor="end" fill="#555" font-size="12">row nearest</text>
+  <text x="80" y="150" text-anchor="end" fill="#555" font-size="12">the jack</text>
+  <text x="80" y="185" text-anchor="end" fill="#555" font-size="12">far row</text>
+
+  <!-- adapter -->
+  <text x="530" y="92" text-anchor="middle" fill="#222" font-weight="bold">USB-serial adapter (3.3 V)</text>
+  <rect x="440" y="102" width="180" height="140" rx="6" fill="#f1f3f5" stroke="#6b7078"/>
+  <rect x="434" y="114" width="12" height="12" fill="#d4a62a"/>
+  <rect x="434" y="144" width="12" height="12" fill="#d4a62a"/>
+  <rect x="434" y="184" width="12" height="12" fill="#d4a62a"/>
+  <rect x="434" y="219" width="12" height="12" fill="#d4a62a"/>
+  <text x="456" y="125" fill="#222">RXD</text>
+  <text x="456" y="155" fill="#222">TXD</text>
+  <text x="456" y="195" fill="#222">GND</text>
+  <text x="456" y="230" fill="#222">VCC</text>
+
+  <!-- wires: board TX to adapter RXD (orange), board RX to adapter TXD (blue), GND (black) -->
+  <polyline points="180,130 320,130 320,120 434,120" fill="none" stroke="#e8590c" stroke-width="3"/>
+  <polyline points="120,130 120,93 360,93 360,150 434,150" fill="none" stroke="#1c7ed6" stroke-width="3"/>
+  <polyline points="180,180 400,180 400,190 434,190" fill="none" stroke="#222" stroke-width="3"/>
+  <circle cx="120" cy="130" r="4" fill="#1c7ed6"/>
+  <circle cx="180" cy="130" r="4" fill="#e8590c"/>
+  <circle cx="180" cy="180" r="4" fill="#222"/>
+
+  <!-- VCC not connected -->
+  <line x1="434" y1="225" x2="404" y2="225" stroke="#888" stroke-width="2"/>
+  <path d="M396 217 L412 233 M412 217 L396 233" stroke="#c92a2a" stroke-width="3"/>
+  <text x="390" y="230" text-anchor="end" fill="#c92a2a" font-size="12">VCC: leave unconnected</text>
+
+  <line x1="20" y1="262" x2="44" y2="262" stroke="#e8590c" stroke-width="3"/>
+  <text x="50" y="267" fill="#333" font-size="13">board TX → adapter RXD</text>
+  <line x1="230" y1="262" x2="254" y2="262" stroke="#1c7ed6" stroke-width="3"/>
+  <text x="260" y="267" fill="#333" font-size="13">board RX ← adapter TXD</text>
+  <line x1="440" y1="262" x2="464" y2="262" stroke="#222" stroke-width="3"/>
+  <text x="470" y="267" fill="#333" font-size="13">GND ↔ GND</text>
+  <text x="20" y="292" fill="#333" font-size="13">Seen from above, with the board's rear edge (network jacks) at the top. Either GND pin works.</text>
+  <text x="20" y="312" fill="#333" font-size="13">TX and RX cross over. 3.3 V logic only, 115200 baud, 8N1, no flow control. Not to scale.</text>
+</svg>
