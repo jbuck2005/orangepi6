@@ -9,7 +9,7 @@ Kernel lines:
 | Line | Kernel | Where | State |
 |---|---|---|---|
 | 6.18.14 | kernel.org 6.18.14 + Sky1 patches (139) | `main` until PR #1 | released as **v2026.11.19**, superseded |
-| 6.18 LTS | kernel.org 6.18.64 + Sky1 patches, 5 rebased, 6 post patches | `main`, `KERNEL_TRACK=6.18` (default) | released as v2026.11.19.1, then **v2026.11.22.1** with the NPU driver (current default) |
+| 6.18 LTS | kernel.org 6.18.64 + Sky1 patches, 5 rebased, 6 post patches | `main`, `KERNEL_TRACK=6.18` (default) | released as v2026.11.19.1, then v2026.11.22.1 with the NPU driver, then **v2026.11.23** with .deb packages (current default) |
 | Kernel 7 | kernel.org 7.3.5 + our forward port of Sky1 patches-next (56 patches) | `main`, `KERNEL_TRACK=7` (merged 2026-11-22; developed on branch `kernel-7`) | released as **v2026.11.22** (pre-release, optional) |
 
 ## Quick index of findings
@@ -598,6 +598,23 @@ Change:
   it now says which.
 - `docs/packages.md`; INSTALL points to it; README has a "Building for distribution" section with the full
   command sequence for the release assets, .deb packages included.
+
+## 2026-11-23: release v2026.11.23 (6.18.64 as .deb packages)
+
+- Release **v2026.11.23** (Latest), at `main` `0dd12fb`: the same 6.18.64 kernel as v2026.11.22.1 (the kernel inputs
+  are identical; packaged again from the board's build in `~/sky1-build`), now with the .deb packages next to the
+  tarballs. `package-release.sh` wrote all of the assets and checked that the shipped source is the one that was built:
+  - `orangepi6-kernel-6.18_6.18.64-2026.11.23-1_arm64.deb`
+  - `orangepi6-npu_4.1.0-2026.11.23-1_arm64.deb`
+  - `sky1-kernel-6.18.64-sky1-v2026.11.23-arm64.tar.xz` and `linux-6.18.64-sky1-v2026.11.23-source.tar.xz`
+  - `SHA256SUMS` covering all four
+- Board check before publishing: `apt install` of both packages upgraded over the `-2026.11.22.1-1` builds ("2
+  upgraded"), and every check passed with "Sky1 (acpi)" still the default. A download from the published release,
+  without logging in, matched `SHA256SUMS`.
+- `kernel.conf`: `setup.sh --prebuilt` on the 6.18 track now installs v2026.11.23. The 7.3.5 pre-release v2026.11.22
+  is unchanged and has no packages; a kernel-7 package can be made from it with `KERNEL_TRACK=7 scripts/package-deb.sh
+  from-release v2026.11.22`.
+- README (releases table and examples), INSTALL, STATUS, `docs/npu.md` and `docs/packages.md` name the new release.
 
 ## Open items
 
