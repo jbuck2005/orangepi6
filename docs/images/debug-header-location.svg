@@ -1,40 +1,122 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="660" height="400" viewBox="0 0 660 400" font-family="Helvetica, Arial, sans-serif" font-size="14">
-  <title>Where the DEBUG header is on the Orange Pi 6: just below the left network jack</title>
-  <rect width="660" height="400" fill="#ffffff"/>
-
-  <!-- board outline, rear edge at the top -->
-  <rect x="20" y="40" width="620" height="300" rx="14" fill="#2f5e9e" stroke="#1d3d68" stroke-width="2"/>
-  <circle cx="42" cy="62" r="7" fill="#ffffff" stroke="#c9a227" stroke-width="3"/>
-  <circle cx="618" cy="62" r="7" fill="#ffffff" stroke="#c9a227" stroke-width="3"/>
-  <circle cx="42" cy="318" r="7" fill="#ffffff" stroke="#c9a227" stroke-width="3"/>
-  <circle cx="618" cy="318" r="7" fill="#ffffff" stroke="#c9a227" stroke-width="3"/>
-  <text x="630" y="20" text-anchor="end" fill="#555" font-size="12">rear edge</text>
-
-  <!-- rear-edge connectors -->
-  <rect x="60" y="26" width="120" height="90" rx="3" fill="#c9ccd1" stroke="#6b7078"/>
-  <text x="120" y="66" text-anchor="middle" fill="#222" font-weight="bold">Left</text>
-  <text x="120" y="84" text-anchor="middle" fill="#222" font-weight="bold">RJ45</text>
-  <rect x="192" y="30" width="44" height="80" rx="3" fill="#c9ccd1" stroke="#6b7078"/>
-  <text x="214" y="75" text-anchor="middle" fill="#222" font-size="12">DP</text>
-  <rect x="248" y="30" width="70" height="80" rx="3" fill="#c9ccd1" stroke="#6b7078"/>
-  <text x="283" y="75" text-anchor="middle" fill="#222" font-size="12">USB</text>
-  <rect x="332" y="30" width="290" height="80" rx="3" fill="none" stroke="#c9ccd1" stroke-width="2" stroke-dasharray="6 5"/>
-  <text x="477" y="75" text-anchor="middle" fill="#e9ecef" font-size="12">other rear connectors</text>
-
-  <!-- DEBUG header just below the left jack -->
-  <circle cx="129" cy="142" r="26" fill="none" stroke="#ffd43b" stroke-width="3"/>
-  <rect x="115" y="128" width="28" height="28" rx="2" fill="#1e1e1e"/>
-  <rect x="119" y="132" width="7" height="7" fill="#d4a62a"/>
-  <rect x="132" y="132" width="7" height="7" fill="#d4a62a"/>
-  <rect x="119" y="145" width="7" height="7" fill="#d4a62a"/>
-  <rect x="132" y="145" width="7" height="7" fill="#d4a62a"/>
-
-  <!-- callout -->
-  <polyline points="155,150 230,195 250,195" fill="none" stroke="#ffd43b" stroke-width="2.5"/>
-  <text x="258" y="192" fill="#ffffff" font-weight="bold" font-size="16">DEBUG header (2x2, UART2)</text>
-  <text x="258" y="214" fill="#ffffff" font-size="13">just below the left network jack,</text>
-  <text x="258" y="232" fill="#ffffff" font-size="13">silkscreen "DEBUG"</text>
-
-  <text x="20" y="366" fill="#333" font-size="13">Board seen from above, rear edge at the top. Simplified, not to scale: only the connectors</text>
-  <text x="20" y="386" fill="#333" font-size="13">nearest the header are drawn. Pinout and wiring: see the pinout diagram.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="648" viewBox="0 0 780 648" font-family="Helvetica, Arial, sans-serif">
+<title>Orange Pi 6 top side, 90 x 90 mm: the DEBUG header is just below the left network jack</title>
+<rect width="780" height="648" fill="#ffffff"/>
+<rect x="160.0" y="80.0" width="450.0" height="450.0" rx="18" fill="#2f5e9e" stroke="#1d3d68" stroke-width="2"/>
+<circle cx="172.0" cy="92.0" r="7" fill="#ffffff" stroke="#c9a227" stroke-width="3"/>
+<circle cx="598.0" cy="92.0" r="7" fill="#ffffff" stroke="#c9a227" stroke-width="3"/>
+<circle cx="173.0" cy="517.0" r="7" fill="#ffffff" stroke="#c9a227" stroke-width="3"/>
+<circle cx="597.0" cy="517.0" r="7" fill="#ffffff" stroke="#c9a227" stroke-width="3"/>
+<rect x="182.0" y="60.0" width="98.0" height="125.0" rx="2" fill="#c9ccd1" stroke="#6b7078" />
+<text x="227.5" y="125.0" text-anchor="middle" font-size="13" fill="#222" font-weight="bold">LAN</text>
+<text x="227.5" y="142.0" text-anchor="middle" font-size="11" fill="#222" font-weight="normal">USB 3.0</text>
+<rect x="285.0" y="65.0" width="27.5" height="110.0" rx="2" fill="#c9ccd1" stroke="#6b7078" />
+<rect x="345.0" y="70.0" width="60.0" height="90.0" rx="2" fill="#c9ccd1" stroke="#6b7078" />
+<rect x="445.0" y="70.0" width="30.0" height="115.0" rx="2" fill="#c9ccd1" stroke="#6b7078" />
+<rect x="490.0" y="60.0" width="98.0" height="125.0" rx="2" fill="#c9ccd1" stroke="#6b7078" />
+<text x="542.5" y="125.0" text-anchor="middle" font-size="13" fill="#222" font-weight="bold">LAN</text>
+<text x="542.5" y="142.0" text-anchor="middle" font-size="11" fill="#222" font-weight="normal">USB 3.0</text>
+<rect x="325.0" y="167.5" width="55.0" height="17.5" rx="1" fill="#1e1e1e" stroke="#1e1e1e" />
+<rect x="395.0" y="167.5" width="27.5" height="17.5" rx="1" fill="#f1f3f5" stroke="#6b7078" />
+<rect x="596.5" y="107.5" width="13.5" height="82.5" rx="1" fill="#e9ecef" stroke="#6b7078" />
+<rect x="590.0" y="265.0" width="20.0" height="30.0" rx="1" fill="#f1f3f5" stroke="#6b7078" />
+<rect x="595.0" y="305.0" width="15.0" height="15.0" rx="1" fill="#f1f3f5" stroke="#6b7078" />
+<rect x="560.0" y="335.0" width="60.0" height="35.0" rx="2" fill="#1e1e1e" stroke="#1e1e1e" />
+<rect x="595.0" y="382.5" width="15.0" height="15.0" rx="1" fill="#f1f3f5" stroke="#6b7078" />
+<rect x="595.0" y="407.5" width="15.0" height="15.0" rx="1" fill="#f1f3f5" stroke="#6b7078" />
+<circle cx="600" cy="440" r="4" fill="#9be15d" stroke="#2b8a3e"/>
+<rect x="590.0" y="482.5" width="25.0" height="15.0" rx="1" fill="#1e1e1e" stroke="#1e1e1e" />
+<rect x="557.5" y="512.5" width="22.5" height="20.0" rx="1" fill="#f1f3f5" stroke="#6b7078" />
+<rect x="164.0" y="200.0" width="26.0" height="270.0" rx="1" fill="#1e1e1e" stroke="#1e1e1e" />
+<rect x="165.8" y="204.5" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="204.5" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="217.8" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="217.8" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="231.0" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="231.0" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="244.2" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="244.2" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="257.5" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="257.5" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="270.8" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="270.8" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="284.0" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="284.0" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="297.2" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="297.2" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="310.5" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="310.5" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="323.8" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="323.8" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="337.0" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="337.0" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="350.2" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="350.2" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="363.5" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="363.5" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="376.8" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="376.8" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="390.0" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="390.0" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="403.2" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="403.2" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="416.5" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="416.5" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="429.8" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="429.8" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="443.0" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="443.0" width="6" height="6" fill="#d4a62a"/>
+<rect x="165.8" y="456.2" width="6" height="6" fill="#d4a62a"/>
+<rect x="178.4" y="456.2" width="6" height="6" fill="#d4a62a"/>
+<rect x="161.5" y="477.5" width="13.5" height="15.0" rx="1" fill="#1e1e1e" stroke="#1e1e1e" />
+<rect x="295.0" y="295.0" width="180.0" height="145.0" rx="3" fill="#3d3f44" stroke="#2b2d31" />
+<rect x="325.0" y="320.0" width="120.0" height="95.0" rx="2" fill="#6c7079" stroke="#2b2d31" />
+<text x="385.0" y="374.0" text-anchor="middle" font-size="14" fill="#ffffff" font-weight="bold">SoC</text>
+<rect x="285.0" y="455.0" width="80.0" height="60.0" rx="1" fill="#2b2d31" stroke="#2b2d31" />
+<rect x="405.0" y="455.0" width="80.0" height="60.0" rx="1" fill="#2b2d31" stroke="#2b2d31" />
+<text x="385.0" y="490.0" text-anchor="middle" font-size="12" fill="#e9ecef" font-weight="normal">RAM</text>
+<rect x="211.2" y="214.2" width="27.5" height="27.5" rx="1" fill="#1e1e1e" stroke="#1e1e1e" />
+<rect x="215.2" y="218.2" width="7" height="7" fill="#d4a62a"/>
+<rect x="215.2" y="230.8" width="7" height="7" fill="#d4a62a"/>
+<rect x="227.8" y="218.2" width="7" height="7" fill="#d4a62a"/>
+<rect x="227.8" y="230.8" width="7" height="7" fill="#d4a62a"/>
+<circle cx="225.0" cy="228.0" r="27" fill="none" stroke="#ffd43b" stroke-width="4"/>
+<polyline points="298.8,70.0 298.8,50.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<text x="298.8" y="46.0" text-anchor="middle" font-size="13" fill="#222" font-weight="normal">DP</text>
+<polyline points="375.0,70.0 375.0,50.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<text x="375.0" y="46.0" text-anchor="middle" font-size="13" fill="#222" font-weight="normal">USB 2.0 ×2</text>
+<polyline points="460.0,70.0 460.0,50.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<text x="460.0" y="46.0" text-anchor="middle" font-size="13" fill="#222" font-weight="normal">HDMI</text>
+<text x="227.5" y="46.0" text-anchor="middle" font-size="12" fill="#555" font-weight="normal">network jacks</text>
+<text x="542.5" y="46.0" text-anchor="middle" font-size="12" fill="#555" font-weight="normal">network jacks</text>
+<text x="385.0" y="22.0" text-anchor="middle" font-size="12" fill="#555" font-weight="normal">rear edge</text>
+<text x="352.5" y="207.5" text-anchor="middle" font-size="10" fill="#ffffff" font-weight="normal">USB 9-pin</text>
+<text x="410.0" y="225.0" text-anchor="middle" font-size="10" fill="#ffffff" font-weight="normal">fan</text>
+<polyline points="198.0,228.0 149.0,228.0" fill="none" stroke="#e0a800" stroke-width="1.2"/>
+<text x="145.0" y="224.0" text-anchor="end" font-size="15" fill="#222" font-weight="bold">DEBUG header</text>
+<text x="145.0" y="241.0" text-anchor="end" font-size="12" fill="#222" font-weight="normal">UART2, 3.3 V</text>
+<polyline points="162.5,335.0 149.0,331.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<text x="145.0" y="335.0" text-anchor="end" font-size="13" fill="#222" font-weight="normal">40-pin GPIO</text>
+<polyline points="162.5,485.0 149.0,481.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<text x="145.0" y="485.0" text-anchor="end" font-size="13" fill="#222" font-weight="normal">FAST BOOT key</text>
+<polyline points="610.0,147.5 621.0,147.5" fill="none" stroke="#555" stroke-width="1.2"/>
+<text x="625.0" y="151.5" text-anchor="start" font-size="13" fill="#222" font-weight="normal">eDP</text>
+<polyline points="610.0,280.0 621.0,280.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<text x="625.0" y="284.0" text-anchor="start" font-size="13" fill="#222" font-weight="normal">touch panel</text>
+<polyline points="610.0,312.5 621.0,312.5" fill="none" stroke="#555" stroke-width="1.2"/>
+<text x="625.0" y="316.5" text-anchor="start" font-size="13" fill="#222" font-weight="normal">speaker</text>
+<polyline points="620.0,352.5 621.0,352.5" fill="none" stroke="#555" stroke-width="1.2"/>
+<text x="625.0" y="356.5" text-anchor="start" font-size="13" fill="#222" font-weight="normal">audio jack</text>
+<polyline points="610.0,390.0 621.0,390.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<text x="625.0" y="394.0" text-anchor="start" font-size="13" fill="#222" font-weight="normal">mic</text>
+<polyline points="610.0,415.0 621.0,415.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<text x="625.0" y="419.0" text-anchor="start" font-size="13" fill="#222" font-weight="normal">speaker</text>
+<polyline points="610.0,440.0 621.0,440.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<text x="625.0" y="444.0" text-anchor="start" font-size="13" fill="#222" font-weight="normal">LED</text>
+<polyline points="615.0,490.0 621.0,490.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<text x="625.0" y="494.0" text-anchor="start" font-size="13" fill="#222" font-weight="normal">power key</text>
+<polyline points="568.8,532.5 568.8,550.0" fill="none" stroke="#555" stroke-width="1.2"/>
+<text x="568.8" y="564.0" text-anchor="middle" font-size="13" fill="#222" font-weight="normal">RTC</text>
+<text x="20.0" y="582.0" text-anchor="start" font-size="13" fill="#333" font-weight="normal">Top side, rear edge at the top, drawn to scale (90 x 90 mm). Underside: a USB-C port (power, DP) below each</text>
+<text x="20.0" y="602.0" text-anchor="start" font-size="13" fill="#333" font-weight="normal">network jack, microSD and reset key on the right edge, two M.2 M-key (NVMe) slots and an M.2 E-key (Wi-Fi).</text>
+<text x="20.0" y="622.0" text-anchor="start" font-size="13" fill="#333" font-weight="normal">Positions measured from Orange Pi's published board photos; small parts are approximate.</text>
 </svg>
