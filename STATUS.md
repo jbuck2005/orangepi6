@@ -90,6 +90,10 @@ Details: [docs/npu.md](docs/npu.md).
 - [ ] Check classification results against the ImageNet labels; more hub models (detection, segmentation).
 - [x] Released in v2026.11.22.1 and v2026.11.23 (6.18.64). The 7.3.5 pre-release (v2026.11.22) keeps the old driver until its next build.
 
+## Phase 3: bird recognition (planning, 2026-11-24)
+Plan: [docs/bird-recognition.md](docs/bird-recognition.md).
+- [ ] Hub CLIP graph with float embeddings, compared with FP32 CLIP on the CPU.
+
 ## Ruled out
 - The CIX/Canonical vendor kernel and the closed Mali stack (`Sky1-Linux/cix-gpu-kmd` + `libmali`): closed userspace and no Vulkan.
 - NCZ-OS (including the old "Magnetar" net installer): RC kernel, Orange Pi 6 untested, vendor GPU stack by default, and telnet/root logins on by default.

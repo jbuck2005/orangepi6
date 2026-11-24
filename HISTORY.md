@@ -673,9 +673,17 @@ Change:
 - `bench/stability.sh`: the summary line of each stress round printed the failure count but not the pass count (the
   per-cycle stress log had both). Fixed; the stress log and the off-board copy are now written separately.
 
+## 2026-11-24: bird recognition plan
+
+- `docs/bird-recognition.md`: plan for running a bird station's detection (OWL-ViT today) and BioCLIP 2 species
+  embeddings on the NPU, on this repo's open stack. Phases start with the hub's CLIP graph, then a pack runner with
+  float outputs, BioCLIP 2 and a detector compiled with CixBuilder, and an accuracy check (no more than 1 to 2 %
+  below the CPU model). Planning only; nothing built.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.
+- Bird recognition: open questions in `docs/bird-recognition.md` (how the station uses the NPU).
 - Kernel 7: the cause of the one 49 s build failure (not seen again in 20 builds); the
   quick-reboot fallback (`sky1_pending` still set after a confirmed boot); CIX display drivers; drop the debug
   patches `0050`/`0051`.
