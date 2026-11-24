@@ -5,6 +5,13 @@ sessions. It is never merged into `main`.
 
 ---
 
+## 2026-11-24: Bird recognition plan moved out
+
+**Changed:** the plan from #26 belongs in `unsubscribird-forge` (its PR #1), not this board repo. #26 is closed
+and nothing from it landed on `main`.
+
+---
+
 ## 2026-11-24: Bird recognition plan
 
 **Did:** wrote `docs/bird-recognition.md` (PR #26 into `main`): running a bird station's detection and BioCLIP 2
