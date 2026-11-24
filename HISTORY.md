@@ -659,10 +659,24 @@ Change:
   6.18.64 LTS as the alternative.
 - A 10-hour run on the release build, with per-cycle logs, started 2026-11-24.
 
+## 2026-11-24: 10-hour run on the v2026.11.24 release build
+
+- The release packages themselves (`orangepi6-kernel-7` 7.3.5-2026.11.24-1 and `orangepi6-npu` 4.1.0-2026.11.24-1),
+  installed with `apt` and booted, at 6000 MT/s with the NVMe SSD cooled. `bench/stability.sh FULL=1 HOURS=10`, with
+  every cycle's logs kept and copied off the board.
+- **20 of 20** full from-scratch kernel builds (`-j6`, about 21 minutes each) and **19 of 19** `stress-ng --vm 6
+  --verify --cpu 6` rounds passed ("passed: 12, failed: 0" each; the 20th cycle reached the time limit before its
+  stress round). No oops, BUG or call trace in the kernel log, and no panic or DDR ECC report on the serial console,
+  which this time also carried every progress line.
+- Peak temperatures: CPU/SoC 56 °C; NVMe composite 41 °C, controller ("Sensor 1") 60 °C.
+- The 49-second build failure from the 8-hour run did not recur.
+- `bench/stability.sh`: the summary line of each stress round printed the failure count but not the pass count (the
+  per-cycle stress log had both). Fixed; the stress log and the off-board copy are now written separately.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.
-- Kernel 7: the 10 h run on the release build; the cause of the one 49 s build failure if it repeats; the
+- Kernel 7: the cause of the one 49 s build failure (not seen again in 20 builds); the
   quick-reboot fallback (`sky1_pending` still set after a confirmed boot); CIX display drivers; drop the debug
   patches `0050`/`0051`.
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.

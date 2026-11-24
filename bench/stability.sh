@@ -52,9 +52,11 @@ while [ $SECONDS -lt $END ]; do
   [ $SECONDS -ge $END ] && break
   t0=$SECONDS
   out=$(stress-ng --vm 6 --vm-bytes 60% --verify --cpu 6 --timeout ${STRESS_MIN}m 2>&1)
-  pass=$(echo "$out" > "$LD/iter$i-stress.log"; echo "$out" | grep -iE "fail|error|verif" | head -5 >> $L; keep $i| grep -oE "passed: [0-9]+" | head -1); fail=$(echo "$out" | grep -oE "failed: [0-9]+" | head -1)
+  echo "$out" > "$LD/iter$i-stress.log"
+  pass=$(echo "$out" | grep -oE "passed: [0-9]+" | head -1); fail=$(echo "$out" | grep -oE "failed: [0-9]+" | head -1)
   say "iter $i stress $pass $fail $(( (SECONDS - t0) / 60 ))min $(temps) $(edac)"
   echo "$out" | grep -iE "fail|error|verif" | head -5 >> $L
+  keep $i
   [ "${fail#failed: }" != "0" ] && { fails=$((fails + 1)); say "iter $i STRESS FAILED"; }
   sync
 done
