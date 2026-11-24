@@ -36,8 +36,9 @@ scheduler builds:
   (they appear to share a last-level cache).
 
 The MC domain is both the "last-level cache" domain (`sd_llc`) and the asymmetric-capacity domain
-(`sd_asym_cpucapacity`). On most big.LITTLE systems those are different domains. This board is unusual in that they
-are the same one, and that is what lets the 7.x change below reach it.
+(`sd_asym_cpucapacity`). On most big.LITTLE systems those are different domains. That does not shield them from the
+7.x change below: since 7.2 the asymmetric-capacity domain gets its own `shared` data on every system with CPUs of
+different capacity, so the limit described below applies there too.
 
 ## Symptom
 
@@ -128,9 +129,14 @@ nr_idle_scan = 12 · y / 1024
 ```
 
 With 8 threads at around 900 util, sum_util is around 7200, so x ≈ 600, y ≈ 543 and `nr_idle_scan` ≈ 6. The scan
-then stops after **six CPUs** counted from `target`. Because the MC domain here is both the LLC domain (so
-`sd->shared` exists) and the asymmetric domain, the limit applies to this scan. On a typical big.LITTLE system the
-asymmetric domain sits above the LLC domain, has no `shared` data, and is never limited.
+then stops after **six CPUs** counted from `target`. Since 7.2 the asymmetric-capacity domain always has `shared`
+data (`claim_asym_sched_domain_shared()` in `kernel/sched/topology.c`), so the limit applies to this scan on any
+big.LITTLE system, not only on this board. The board's CPU numbering, with the little cores between two groups of
+big cores, makes it easy to hit, but a system with its little cores first and its big cores after them is hit in the
+same way when a task wakes on a little core.
+
+The cause is commit `61ea17a63719` ("sched/fair: Add SIS_UTIL support to select_idle_capacity()"), first in 7.2. The
+function is unchanged in 7.4-rc4. It was reported upstream as a regression on 2026-11-24.
 
 Which six CPUs are scanned depends on where the thread last ran:
 
