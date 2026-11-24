@@ -13,14 +13,13 @@ One script takes a fresh Armbian install to a working GPU, NPU and network in ab
 | Display output | not tested | the board runs headless; on kernel 7 the CIX display drivers are off |
 
 - **Base OS:** stock Armbian generic **UEFI arm64** image (Ubuntu 26.04 "resolute" userspace) on an NVMe SSD.
-- **Kernel:** Linux **6.18.64** (6.18 LTS) from kernel.org plus the
-  [Sky1-Linux/linux-sky1](https://github.com/Sky1-Linux/linux-sky1) patches (commit `57e018a`; the 5 that needed
-  rebasing for 6.18.64, and 4 fixes of our own, are in [patches/6.18.64/](patches/6.18.64/)). It boots in the
-  firmware's **ACPI** mode. The version is set in [kernel.conf](kernel.conf). This is the default.
-- **Kernel 7 (optional):** Linux **7.3.5** from kernel.org with this repo's forward port of the Sky1 patches
-  ([patches/7.3/](patches/7.3/), [docs/KERNEL-7.md](docs/KERNEL-7.md)). Install it with `KERNEL_TRACK=7`. It matches
-  6.18.64 on the GPU and on the CPU, and a build from `main` runs the NPU, but it has had far less testing; see
-  [Known issues](#known-issues).
+- **Kernel (default):** Linux **7.3.5** from kernel.org with this repo's forward port of the
+  [Sky1-Linux/linux-sky1](https://github.com/Sky1-Linux/linux-sky1) patches ([patches/7.3/](patches/7.3/),
+  [docs/KERNEL-7.md](docs/KERNEL-7.md)). It boots in the firmware's **ACPI** mode and matches 6.18.64 on the GPU,
+  the CPU and the NPU. The version is set in [kernel.conf](kernel.conf).
+- **Kernel 6.18 LTS (alternative):** Linux **6.18.64** from kernel.org plus the Sky1-Linux patches (commit `57e018a`;
+  the 5 that needed rebasing for 6.18.64, and our own fixes, are in [patches/6.18.64/](patches/6.18.64/)). The
+  longest-tested kernel; install it with `KERNEL_TRACK=6.18`.
 - **GPU:** mainline **panthor**, with Mesa from Ubuntu 26.04: **panvk** (Vulkan 1.4) and **Panfrost** (GLES 3.1).
   No CIX vendor kernel and no closed Mali (`mali_kbase` / `libmali`) stack.
 - **NPU:** CIX's open **6.2.0** `armchina-npu` driver (replacing the old one in the Sky1 series, on both kernels) and
@@ -49,7 +48,7 @@ The full guide, with every firmware step, is [INSTALL.md](INSTALL.md). In short:
    ```
 
 Hands-on time is about 15 minutes. `--prebuilt` downloads the release kernel and checks it against the release's
-`SHA256SUMS`; the source path fetches kernel.org 6.18.64, checks its signature, patches it strictly (no fuzz) and
+`SHA256SUMS`; the source path fetches kernel.org 7.3.5, checks its signature, patches it strictly (no fuzz) and
 builds it on the board. Either way the kernel goes into `/boot/sky1/` and every step is verified (`install.sh verify`).
 
 `setup.sh npu` runs on the sky1 boot: it checks that the NPU driver is 6.2.0, builds and installs `libaipudrv` into
@@ -57,21 +56,22 @@ builds it on the board. Either way the kernel goes into `/boot/sky1/` and every 
 from the hub and try it, for example `npu-run bench mobilenet_v2.cix 200`; the commands are in
 [docs/npu.md](docs/npu.md#running-a-model).
 
-For kernel 7.3.5 instead, put `KERNEL_TRACK=7` in front of the setup command:
-`KERNEL_TRACK=7 scripts/setup.sh` builds it from source (needed for the NPU on 7.3.5);
-`KERNEL_TRACK=7 scripts/setup.sh --prebuilt` installs the v2026.11.22 pre-release, which has the old NPU driver. The choice is remembered, so
-`scripts/setup.sh check` needs no prefix. To switch an installed board between 6.18 and 7, boot Armbian's kernel and
-run `FORCE=1 KERNEL_TRACK=<6.18|7> scripts/setup.sh --prebuilt`. Only one sky1 kernel is installed at a time.
+For the 6.18.64 LTS kernel instead, put `KERNEL_TRACK=6.18` in front of the setup command
+(`KERNEL_TRACK=6.18 scripts/setup.sh --prebuilt`, or without `--prebuilt` to build it). The choice is remembered, so
+`scripts/setup.sh check` needs no prefix, and a board already set up on 6.18 stays on it. To switch an installed
+board between 7 and 6.18, boot Armbian's kernel and run `FORCE=1 KERNEL_TRACK=<7|6.18> scripts/setup.sh --prebuilt`.
+Only one sky1 kernel is installed at a time.
 
 ## Releases
 Each release has a prebuilt kernel, its exact patched source and `SHA256SUMS`. Since v2026.11.23 it also has the kernel and the NPU
-library as .deb packages (`sudo apt install ./orangepi6-kernel-6.18_*_arm64.deb`, see [docs/packages.md](docs/packages.md)).
+library as .deb packages (`sudo apt install ./orangepi6-kernel-7_*_arm64.deb`, see [docs/packages.md](docs/packages.md)).
 
 | Release | Kernel | NPU | State |
 |---|---|---|---|
-| [v2026.11.23](../../releases/tag/v2026.11.23) | 6.18.64 LTS | 6.2.0 driver | **Latest**, what `setup.sh --prebuilt` installs; also as .deb packages |
+| [v2026.11.24](../../releases/tag/v2026.11.24) | 7.3.5 | 6.2.0 driver | **Latest**, what `setup.sh --prebuilt` installs; also as .deb packages |
+| [v2026.11.23](../../releases/tag/v2026.11.23) | 6.18.64 LTS | 6.2.0 driver | the LTS alternative (`KERNEL_TRACK=6.18`); also as .deb packages |
 | [v2026.11.22.1](../../releases/tag/v2026.11.22.1) | 6.18.64 LTS | 6.2.0 driver | the same kernel, without packages |
-| [v2026.11.22](../../releases/tag/v2026.11.22) | 7.3.5 | old driver (`setup.sh npu` refuses it) | pre-release; build 7.3.5 from source for the NPU |
+| [v2026.11.22](../../releases/tag/v2026.11.22) | 7.3.5 | old driver (`setup.sh npu` refuses it) | pre-release, superseded by v2026.11.24 |
 | v2026.11.19.1, v2026.11.19 | 6.18.64, 6.18.14 | old driver | superseded |
 
 ## Building for distribution
@@ -80,10 +80,10 @@ Every release asset is made on the board from a normal build, with these command
 ```bash
 # 1. build the kernel from source (kernel.org signature checked, strict patching), as in the quick start
 scripts/setup.sh preflight && scripts/setup.sh packages && scripts/setup.sh source && scripts/setup.sh build
-#    for kernel 7 instead: KERNEL_TRACK=7 in front of each command
+#    for the 6.18 LTS kernel instead: KERNEL_TRACK=6.18 in front of each command
 
 # 2. package it: the prebuilt tarball, the patched source, the .deb packages and SHA256SUMS, into ~/sky1-build/release/
-scripts/package-release.sh v2026.11.23         # the release tag; NPU_DEB=0 skips the NPU package
+scripts/package-release.sh v2026.11.24         # the release tag; NPU_DEB=0 skips the NPU package
 ```
 
 `package-release.sh` checks that the shipped source is the one that was built, then calls `scripts/package-deb.sh`,
@@ -93,20 +93,20 @@ which writes:
 |---|---|
 | `sky1-kernel-<release>-<tag>-arm64.tar.xz` | Image, non-Plus DTB, `.config`, modules (what `setup.sh --prebuilt` installs) |
 | `linux-<release>-<tag>-source.tar.xz` | the exact patched source that was built |
-| `orangepi6-kernel-6.18_<kernel>-<tag>-<rev>_arm64.deb` (or `-7`) | the same kernel as a package for `apt install` |
+| `orangepi6-kernel-7_<kernel>-<tag>-<rev>_arm64.deb` (or `-6.18`) | the same kernel as a package for `apt install` |
 | `orangepi6-npu_4.1.0-<tag>-<rev>_arm64.deb` | Arm China's open NPU library, headers and `npu-run`, built on the board |
 | `SHA256SUMS` | checksums of all of the above |
 
 The packages can also be made on their own:
 
 ```bash
-scripts/package-deb.sh from-release v2026.11.23          # 6.18 kernel package from a published release tarball
-KERNEL_TRACK=7 scripts/package-deb.sh from-release v2026.11.22
-scripts/package-deb.sh npu v2026.11.23                    # NPU package (on the board, arm64)
+scripts/package-deb.sh from-release v2026.11.24          # kernel-7 package from a published release tarball
+KERNEL_TRACK=6.18 scripts/package-deb.sh from-release v2026.11.23
+scripts/package-deb.sh npu v2026.11.24                    # NPU package (on the board, arm64)
 sha256sum ~/sky1-build/release/*.deb
 ```
 
-Package versions are `<kernel>-<tag>-<rev>` (`6.18.64-2026.11.23-1`). `<rev>` is 1 for a tag's first build; a
+Package versions are `<kernel>-<tag>-<rev>` (`7.3.5-2026.11.24-1`). `<rev>` is 1 for a tag's first build; a
 rebuild of the same tag with changed packaging takes `DEB_REVISION=2`, 3, ... in front of the command, so `apt`
 upgrades over it. `from-release` only repacks the published tarball after checking it against the release's `SHA256SUMS`, so it runs
 on any Linux machine with `dpkg-deb`. What the packages do when installed: [docs/packages.md](docs/packages.md).
@@ -177,16 +177,16 @@ Details: [bench/MEMORY-AB-REPORT.md](bench/MEMORY-AB-REPORT.md), [docs/npu.md](d
 - **NPU models:** only precompiled graphs from CIX's model hub run without the closed x86 compiler, and the hub has
   no YOLO graphs. Classification has been checked for consistency (same top 5 on both kernels), not yet against
   ImageNet ground truth. CIX's closed `libnoe` and ONNX Runtime provider are not used or shipped.
-- **Kernel 7 (7.3.5) is optional and less tested than 6.18.64.** GPU and CPU performance match 6.18.64 (the CPU
-  scheduling gap is fixed by `0055`, see [docs/kernel7-cpu-scheduling.md](docs/kernel7-cpu-scheduling.md)), but:
-  - the current build (with the NPU driver `0056`) has been booted once; earlier builds of the same track passed a
-    1 h load test, but there has been no long load run on this one yet;
-  - the fix for the PCIe AER interrupt storm on 7.x (`0053`) has now caught the condition once on the board (the
-    latched bit was cleared and no storm followed), so it is looking good but has little mileage;
-  - the v2026.11.22 pre-release predates the NPU driver update; build from source for the NPU;
+- **Kernel 7 (7.3.5) is the default but has less time on the board than 6.18.64.** Its proving run on the release
+  build: 10 of 10 warm reboots and 3 of 3 cold boots clean, and 8 hours of full kernel builds and `stress-ng --verify`
+  with all 16 stress rounds passing and 15 of 16 builds passing. One build failed after 49 s; its log was lost and
+  no kernel or memory error was logged, so the cause is not known (logs are now kept per cycle). For the most proven
+  kernel, use 6.18.64 (`KERNEL_TRACK=6.18`). Also:
   - the CIX display drivers do not build on 7.x and are off (the board runs headless; the GPU is unaffected);
   - two debug patches (`0050`, `0051`) are still in the series: they add a few log lines on each reboot and a
-    register dump if an AER line is ever cut off.
+    register dump if an AER line is ever cut off;
+  - a reboot less than about 40 s after a boot can make GRUB fall back to Armbian next time, because the boot had
+    not been confirmed yet; `install.sh default` sets the default again.
 
 ## Debug serial console
 The **2x2 "DEBUG" header** just below the left network jack is UART2: 3.3 V, **115200 8N1**. The row nearest the
@@ -203,10 +203,9 @@ boots (`SERIAL=1 scripts/install.sh arm acpi`) use `earlycon=pl011,mmio32,0x040d
 ## Roadmap
 - **Phase 1, GPU:** done (2026-11-18), released as v2026.11.19 and v2026.11.19.1.
 - **Phase 2, NPU:** done (2026-11-22) on an open stack (CIX's 6.2.0 driver, Arm China's open `libaipudrv` 4.1.0),
-  see [docs/npu.md](docs/npu.md). Released in v2026.11.22.1 and v2026.11.23 (6.18.64).
-- **Kernel 7:** 7.3.5 merged as an optional track on 2026-11-22 and released as v2026.11.22 (pre-release). Its CPU
-  gap is fixed and it runs the NPU from source. Next: more boots, a long load run, and a release with `0056`, before
-  it can become the default.
+  see [docs/npu.md](docs/npu.md). Released in v2026.11.22.1 and v2026.11.23 (6.18.64) and v2026.11.24 (7.3.5).
+- **Kernel 7:** 7.3.5 merged as an optional track on 2026-11-22 (pre-release v2026.11.22), proven on the board and
+  made the default on 2026-11-24 in v2026.11.24 (CPU gap fixed, NPU driver 6.2.0). 6.18.64 LTS stays available.
 - **Open:** NPU classification checked against ImageNet labels and more hub models; CIX display drivers on 7.x; an
   RTC battery. The full list is at the end of [HISTORY.md](HISTORY.md#open-items).
 - Ruled out: the CIX/Canonical vendor kernel and closed Mali stack, NCZ-OS, and the original Orange Pi vendor image
@@ -226,7 +225,7 @@ change (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 | `scripts/gpu-test.sh` | vulkaninfo, glmark2 and vkmark, results to `/var/log/sky1-gpu-test.txt` |
 | `scripts/package-release.sh` | builds the release tarballs, the .deb packages and `SHA256SUMS` |
 | `scripts/package-deb.sh`, `packaging/` | the .deb packages: kernel per track and the NPU library ([docs/packages.md](docs/packages.md)) |
-| `kernel.conf` | the two kernel tracks (`KERNEL_TRACK=6.18`, the default, or `7`): version and patch set used by every script |
+| `kernel.conf` | the two kernel tracks (`KERNEL_TRACK=7`, the default, or `6.18`): version and patch set used by every script |
 | `patches/6.18.64/` | rebased Sky1 patches; `post/` holds our fixes (syscore API, r8125 netpoll, AER storm, NPU driver 6.2.0) |
 | `patches/7.3/` | kernel 7 track: the Sky1 patches forward-ported to 7.3.5, plus our fixes (`0044`-`0055`) |
 | `docs/` | kernel 7 notes and board results (`KERNEL-7.md`), the CPU scheduling fix, r8125 vs r8169, the NPU (`npu.md`) |

@@ -1,8 +1,8 @@
 # NPU (Arm China Zhouyi X2) on the Orange Pi 6
 
 Status: **working** (2026-11-22) on 6.18.64 and 7.3.5 (full builds from `main`, the driver loads at boot).
-Released in **v2026.11.22.1** and **v2026.11.23** (6.18.64). The 7.3.5 pre-release v2026.11.22 and earlier releases have the old driver;
-build 7.3.5 from source for the NPU.
+Released in **v2026.11.24** (7.3.5, the default) and **v2026.11.22.1** and **v2026.11.23** (6.18.64). The 7.3.5
+pre-release v2026.11.22 and earlier releases have the old driver.
 
 ## What the NPU is
 
@@ -67,7 +67,7 @@ line). `bench/npu-bringup.sh` does all of this, plus the driver swap below, in o
 
 On a sky1 boot whose build tree is still in `$WORK`, and whose kernel has `CONFIG_ARMCHINA_NPU=m`:
 
-    KERNEL_TRACK=7 bench/npu-bringup.sh      # or the 6.18 track without KERNEL_TRACK
+    bench/npu-bringup.sh                     # kernel 7; KERNEL_TRACK=6.18 for the 6.18 track
 
 It patches the driver into the build tree (keeping a copy of the original), builds and swaps only the module, then
 runs the library build and the model tests.

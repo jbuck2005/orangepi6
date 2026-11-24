@@ -5,8 +5,8 @@ the kernel and the NPU library come as Debian packages that install with plain `
 
 | Package | Contents | Conflicts with |
 |---|---|---|
-| `orangepi6-kernel-6.18` | Linux 6.18.64-sky1 (the default): Image, non-Plus DTB, modules, the install scripts | `orangepi6-kernel-7` |
-| `orangepi6-kernel-7` | Linux 7.3.5-sky1 (optional, newer, less tested; see [KERNEL-7.md](KERNEL-7.md)) | `orangepi6-kernel-6.18` |
+| `orangepi6-kernel-7` | Linux 7.3.5-sky1 (the default; see [KERNEL-7.md](KERNEL-7.md)): Image, non-Plus DTB, modules, the install scripts | `orangepi6-kernel-6.18` |
+| `orangepi6-kernel-6.18` | Linux 6.18.64-sky1 (the LTS alternative, the longest tested) | `orangepi6-kernel-7` |
 | `orangepi6-npu` | Arm China's open NPU library `libaipudrv` 4.1.0, its headers, `npu-run` (see [npu.md](npu.md)) | |
 
 The build script stays: the packages are made from the same build, and `scripts/setup.sh` is still how to build the
@@ -74,8 +74,8 @@ of skipping it as "already the newest version".
 in `SHA256SUMS`. Separately:
 
 ```bash
-scripts/package-deb.sh from-release v2026.11.23          # the 6.18 kernel package, from a published release tarball
-KERNEL_TRACK=7 scripts/package-deb.sh from-release v2026.11.22
+scripts/package-deb.sh from-release v2026.11.24          # the kernel-7 package, from a published release tarball
+KERNEL_TRACK=6.18 scripts/package-deb.sh from-release v2026.11.23
 scripts/package-deb.sh kernel <tree> <tag>               # from a tree laid out like the release tarball
 scripts/package-deb.sh npu <tag>                         # builds libaipudrv and npu-run; on the board (arm64)
 ```

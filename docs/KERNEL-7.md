@@ -1,12 +1,14 @@
 # Kernel 7 track (7.3.5)
 
 The `KERNEL_TRACK=7` track builds the Orange Pi 6 (non-Plus) kernel from **kernel.org 7.3.5 stable** instead of
-6.18 LTS. Sky1-Linux/linux-sky1 has no 7.x patch set (its newest tracks are 6.18.14 LTS, 6.19.4,
+6.18 LTS. It is the default track since v2026.11.24. Sky1-Linux/linux-sky1 has no 7.x patch set (its newest tracks are 6.18.14 LTS, 6.19.4,
 and an rc/next set based on early 7.0 development), so this repo carries its own forward port in
 `patches/7.3/`.
 
-Status (2026-11-22): **merged into `main` as the optional `KERNEL_TRACK=7` track and released as v2026.11.22**
-(pre-release). 6.18.64 LTS stays the default. The 7.3.5 build at `0abe703` (55 patches) boots in ACPI mode, passes
+Status (2026-11-24): **the default track**, released as **v2026.11.24** after a proving run on the release build
+(10/10 warm reboots, 3/3 cold boots, 8 h of full builds and `stress-ng --verify` with 16/16 stress rounds and 15/16
+builds). 6.18.64 LTS stays available with `KERNEL_TRACK=6.18`. It was merged into `main` on 2026-11-22 as an
+optional track (pre-release v2026.11.22). The 7.3.5 build at `0abe703` (55 patches) boots in ACPI mode, passes
 `setup.sh check`, matches 6.18 on the GPU, and since `0055` matches 6.18.64 on the CPU within about 2%. Earlier builds
 of the track passed a 1 h load test at 6000 MT/s and a warm reboot test. Open: the final build has had one boot, and
 the AER fix `0053` has not yet been seen on a boot that would have stormed. The board results below are in date order.
@@ -15,7 +17,7 @@ the AER fix `0053` has not yet been seen on a boot that would have stormed. The 
 Known gap: the CIX display drivers (linlon-dp DPU, trilin DP, eDP panel) do not build on 7.x yet,
 so `kernel.conf` turns `DRM_CIX` off on this track (`KCONFIG_EXTRA`). They need the new DRM private-object
 (`atomic_create_state`) and panel allocation APIs. The board runs headless, and Panthor does not
-depend on them. `KERNEL_TRACK=7 scripts/setup.sh --prebuilt` installs the v2026.11.22 release kernel.
+depend on them. `scripts/setup.sh --prebuilt` installs the v2026.11.24 release kernel.
 
 ## How the port was made
 
@@ -38,7 +40,7 @@ depend on them. `KERNEL_TRACK=7 scripts/setup.sh --prebuilt` installs the v2026.
 
 ## Shared tooling
 
-Both tracks use the same scripts. `kernel.conf` sets these per track (`KERNEL_TRACK=6.18`, the default, or `7`):
+Both tracks use the same scripts. `kernel.conf` sets these per track (`KERNEL_TRACK=7`, the default, or `6.18`):
 
 | Setting | 6.18 | 7 |
 |---|---|---|

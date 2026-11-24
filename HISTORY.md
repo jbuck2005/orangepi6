@@ -9,8 +9,8 @@ Kernel lines:
 | Line | Kernel | Where | State |
 |---|---|---|---|
 | 6.18.14 | kernel.org 6.18.14 + Sky1 patches (139) | `main` until PR #1 | released as **v2026.11.19**, superseded |
-| 6.18 LTS | kernel.org 6.18.64 + Sky1 patches, 5 rebased, 6 post patches | `main`, `KERNEL_TRACK=6.18` (default) | released as v2026.11.19.1, then v2026.11.22.1 with the NPU driver, then **v2026.11.23** with .deb packages (current default) |
-| Kernel 7 | kernel.org 7.3.5 + our forward port of Sky1 patches-next (56 patches) | `main`, `KERNEL_TRACK=7` (merged 2026-11-22; developed on branch `kernel-7`) | released as **v2026.11.22** (pre-release, optional) |
+| 6.18 LTS | kernel.org 6.18.64 + Sky1 patches, 5 rebased, 6 post patches | `main`, `KERNEL_TRACK=6.18` (the default until 2026-11-24) | released as v2026.11.19.1, then v2026.11.22.1 with the NPU driver, then **v2026.11.23** with .deb packages (the LTS alternative) |
+| Kernel 7 | kernel.org 7.3.5 + our forward port of Sky1 patches-next (56 patches) | `main`, `KERNEL_TRACK=7` (merged 2026-11-22, **the default since 2026-11-24**; developed on branch `kernel-7`) | released as v2026.11.22 (pre-release), then **v2026.11.24** (the default, with the NPU driver and .deb packages) |
 
 ## Quick index of findings
 
@@ -629,11 +629,41 @@ Change:
 - Its event lines go to the kernel log at level 3, so they also reach the serial console when the console
   loglevel is the quiet default (4). The earlier lines, at the default level, never reached it.
 
+## 2026-11-24: kernel 7 proven on the board and made the default; release v2026.11.24
+
+The proving run used the release build itself: 7.3.5 from `main` with `0055` (scheduler fix) and `0056` (NPU driver
+6.2.0), installed from its .deb package (first as a local `~rc1` test build, then the release packages), at
+6000 MT/s with the NVMe SSD cooled.
+- **Warm reboots, 10 of 10:** each boot came up on 7.3.5 by default, with both RTL8125 ports trained and their real
+  MACs. `orangepi6-check` passed, `npu-run` reported the NPU ready, and there was no AER storm and no kernel error.
+  Two extra reboots made about 30 s after a boot fell back to Armbian: GRUB still saw `sky1_pending=1`, although the
+  boot report had confirmed the boot. With 75 s between reboots it did not happen again. A known issue, not yet fixed.
+- **Cold boots, 3 of 3:** each was a clean poweroff, a 30 s power cut at the smart plug, and the power button (the
+  board doesn't power itself on without an RTC battery). The same checks passed each time, and memory trained at
+  6000 MT/s.
+- **8 hours of load** (`bench/stability.sh FULL=1`): all 16 stress rounds passed and 15 of 16 full builds passed. One
+  build failed 49 s in; its log was lost (see "stability runs keep every iteration's logs" above). Peak temperatures:
+  CPU 58 °C, NVMe controller 61 °C.
+- The AER fix `0053` was seen working once, on 2026-11-22.
+
+Change:
+- `kernel.conf`: kernel 7 is the default track. `KERNEL_TRACK=6.18` selects 6.18.64 LTS. A board that is already set
+  up keeps its track: the track recorded by the last `stage` (`$WORK/.kernel-track`) wins as before, and a board set
+  up before tracks were recorded (6.18 step markers only) stays on 6.18.
+- Release **v2026.11.24** (Latest), at `main` `b2b1b1c`: the 7.3.5 kernel tarball, its patched source,
+  `orangepi6-kernel-7_7.3.5-2026.11.24-1_arm64.deb`, `orangepi6-npu_4.1.0-2026.11.24-1_arm64.deb` and `SHA256SUMS`,
+  packaged from the board's build. Checked: `apt install` upgraded over the test packages, and the board rebooted
+  into it with every check passing. A download from the published release, without logging in, matched
+  `SHA256SUMS`. 6.18.64 stays available as v2026.11.23.
+- README, INSTALL, STATUS, `docs/KERNEL-7.md`, `docs/packages.md` and `docs/npu.md`: kernel 7 as the default,
+  6.18.64 LTS as the alternative.
+- A 10-hour run on the release build, with per-cycle logs, started 2026-11-24.
+
 ## Open items
 
-- NPU: check classification against ImageNet ground truth; more hub models; a 7.3.5 release with `0056`.
-- .deb packages: attach them to the next release (`package-release.sh`).
-- Kernel 7: more boots and a long load run on the released build; CIX display
-  drivers; drop the debug patches `0050`/`0051`.
+- NPU: check classification against ImageNet ground truth; more hub models.
+- Kernel 7: the 10 h run on the release build; the cause of the one 49 s build failure if it repeats; the
+  quick-reboot fallback (`sky1_pending` still set after a confirmed boot); CIX display drivers; drop the debug
+  patches `0050`/`0051`.
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.

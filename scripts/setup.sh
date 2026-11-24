@@ -19,8 +19,8 @@
 #
 # Re-running is safe: finished steps are skipped (state in $WORK/.setup-*). `setup.sh <step>` runs one step.
 #
-# Kernel track (kernel.conf): 6.18.64 LTS by default. `KERNEL_TRACK=7 scripts/setup.sh [--prebuilt]` installs
-# 7.3.5 instead. To switch an installed board between tracks, boot Armbian's kernel and run
+# Kernel track (kernel.conf): 7.3.5 by default. `KERNEL_TRACK=6.18 scripts/setup.sh [--prebuilt]` installs
+# 6.18.64 LTS instead. To switch an installed board between tracks, boot Armbian's kernel and run
 # `FORCE=1 KERNEL_TRACK=<track> scripts/setup.sh [--prebuilt]`.
 set -euo pipefail
 REPO=$(cd "$(dirname "$0")/.." && pwd)

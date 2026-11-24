@@ -59,7 +59,7 @@
   cycle through Home Assistant, 2026-11-19). Needs an RTC battery (CR2032 on JRTC1): without one a
   power cut resets the firmware settings (6400 -> 6000 MT/s, power-on-after-AC-loss off) and the board stays off.
 
-## Kernel 7.3.5 (optional track, `KERNEL_TRACK=7`, merged 2026-11-22)
+## Kernel 7.3.5 (`KERNEL_TRACK=7`, merged 2026-11-22, the default since v2026.11.24)
 - [x] Sky1-Linux `patches-next` (made for v7.0-rc1) forward-ported to kernel.org 7.3.5: 26 patches picked cleanly,
       17 conflicts resolved by hand (Panthor hand-ported), `0044` for 7.x API changes. Details in `docs/KERNEL-7.md`.
 - [x] Native build on the board; boots in ACPI mode; `setup.sh check` passes; GPU benchmarks at parity with 6.18.
@@ -70,9 +70,12 @@
 - [x] CPU scheduling gap (12-20% slower, threads on the little cores) found and fixed: `0055` (wakeup scan cut short by
       SIS_UTIL). As booted now equals pinned and is within about 2% of 6.18.64. See `docs/kernel7-cpu-scheduling.md`.
 - [x] Mainline `r8169` for the NICs (same as 6.18 on `main`); real MACs on the first 7.3.5 boot with it.
-- [x] Released as v2026.11.22 (pre-release; 6.18.64 stays the default).
-- [ ] The final build (`0abe703`) has one boot so far. More boots, and a long load run on it.
-- [ ] `0053` confirmed on a boot where the storm would have happened.
+- [x] Released as v2026.11.22 (pre-release).
+- [x] `0053` confirmed on a boot where the storm would have happened (the bit was latched, cleared, no storm).
+- [x] Proving run on the release build (with `0056`): 10/10 warm reboots, 3/3 cold boots, 8 h of full builds and
+      `stress-ng --verify` (16/16 stress rounds, 15/16 builds; one 49 s build failure, cause unknown, log lost).
+- [x] Released as **v2026.11.24** and made the default; 6.18.64 LTS stays available with `KERNEL_TRACK=6.18`.
+- [ ] A 10 h run with per-cycle logs (running), and the cause of the one build failure if it repeats.
 - [ ] CIX display drivers (`DRM_CIX`) port to the 7.x DRM APIs (off for now; headless board).
 - [ ] Drop the debug patches `0050`, `0051` once the reboot and AER work is closed.
 

@@ -54,8 +54,8 @@ cd orangepi6
 scripts/setup.sh
 ```
 `setup.sh` checks the board and firmware, installs the build tools and Mesa from the Ubuntu archive, fetches Linux
-6.18.64 (the version in `kernel.conf`) from kernel.org (and checks Greg Kroah-Hartman's signature), applies the Sky1-Linux patches and this repo's
-non-Plus device tree, and builds the kernel (`-j6`, 20 minutes to an hour). It then installs the kernel into `/boot/sky1/`
+7.3.5 (the version in `kernel.conf`) from kernel.org (and checks Greg Kroah-Hartman's signature), applies this repo's port of the Sky1
+patches and its non-Plus device tree, and builds the kernel (`-j6`, 20 minutes to an hour). It then installs the kernel into `/boot/sky1/`
 and makes it the GRUB default. Every step is checked, and the script stops with a clear message on the first failure.
 Re-running it skips steps that are already done.
 
@@ -74,27 +74,28 @@ scripts/setup.sh check        # panthor, /dev/dri/renderD128, Vulkan = panvk, GL
 scripts/gpu-test.sh           # optional: vulkaninfo, glmark2, vkmark
 ```
 
-### Optional: kernel 7.3.5 instead of 6.18.64
-The repo has two kernel tracks (see `kernel.conf`). **6.18.64 LTS is the default** and the most tested. **7.3.5** is
-kernel.org 7.3.5 with this repo's forward port of the Sky1 patches (`patches/7.3/`). It performs the same as 6.18.64
-on the GPU and the CPU, but has had much less time on the board (see `docs/KERNEL-7.md` and the release notes of
-v2026.11.22). To install it, put `KERNEL_TRACK=7` in front of the setup command:
+### Optional: kernel 6.18.64 LTS instead of 7.3.5
+The repo has two kernel tracks (see `kernel.conf`). **7.3.5 is the default** (since v2026.11.24): kernel.org 7.3.5
+with this repo's forward port of the Sky1 patches (`patches/7.3/`). **6.18.64 LTS** is the long-tested alternative,
+with the same GPU and NPU support (see `docs/KERNEL-7.md` for how they compare). To install 6.18.64, put
+`KERNEL_TRACK=6.18` in front of the setup command:
 ```bash
-KERNEL_TRACK=7 scripts/setup.sh --prebuilt     # or KERNEL_TRACK=7 scripts/setup.sh to build it (about 25 min)
+KERNEL_TRACK=6.18 scripts/setup.sh --prebuilt  # or KERNEL_TRACK=6.18 scripts/setup.sh to build it
 sudo reboot
 scripts/setup.sh check                         # remembers the track; no prefix needed
 ```
-Only one sky1 kernel is installed at a time; Armbian's kernel stays entry 0 either way. To switch an installed board
-between the tracks, boot Armbian's kernel, then run `FORCE=1 KERNEL_TRACK=7 scripts/setup.sh --prebuilt` (or
-`KERNEL_TRACK=6.18` to go back), reboot, and run `scripts/setup.sh check`. On 7.3.5 the CIX display drivers are off
+Only one sky1 kernel is installed at a time; Armbian's kernel stays entry 0 either way. A board that was set up on
+6.18.64 stays on it. To switch an installed board between the tracks, boot Armbian's kernel, then run
+`FORCE=1 KERNEL_TRACK=7 scripts/setup.sh --prebuilt` (or `KERNEL_TRACK=6.18` to go back), reboot, and run
+`scripts/setup.sh check`. On 7.3.5 the CIX display drivers are off
 (they don't build on 7.x yet); the board runs headless and the GPU is not affected.
 
 ### Optional: the NPU
 Kernels built from this repo carry CIX's 6.2.0 NPU driver. On the sky1 boot, `scripts/setup.sh npu` builds and
 installs Arm China's open NPU library (`libaipudrv` 4.1.0, into `/usr/local`) and `npu-run`, and prints what the NPU
-reports. Compiled models come from CIX's model hub; see [docs/npu.md](docs/npu.md). No firmware is needed. The 6.18.64
-releases v2026.11.22.1 and v2026.11.23 have it; the earlier releases, and the 7.3.5 pre-release v2026.11.22, have the older driver,
-which the library does not work with (build 7.3.5 from source for the NPU).
+reports. Compiled models come from CIX's model hub; see [docs/npu.md](docs/npu.md). No firmware is needed. Releases
+v2026.11.24 (7.3.5) and v2026.11.22.1 and v2026.11.23 (6.18.64) have it; the earlier releases, including the 7.3.5
+pre-release v2026.11.22, have the older driver, which the library does not work with.
 
 ## How the fallback works
 - Armbian's kernel stays entry 0 in GRUB. The sky1 kernel lives separately in `/boot/sky1/`, so Armbian kernel
