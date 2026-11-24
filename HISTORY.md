@@ -673,6 +673,16 @@ Change:
 - `bench/stability.sh`: the summary line of each stress round printed the failure count but not the pass count (the
   per-cycle stress log had both). Fixed; the stress log and the off-board copy are now written separately.
 
+## 2026-11-24: scheduler regression reported upstream
+
+- The kernel 7 CPU gap fixed by `0055` was reported to the Linux scheduler maintainers as a regression (LKML and the
+  regressions list, 2026-11-24). It is caused by commit `61ea17a63719` ("sched/fair: Add SIS_UTIL support to
+  select_idle_capacity()"), first in 7.2. `select_idle_capacity()` and `update_idle_cpu_scan()` are unchanged in
+  7.4-rc4. `0054` (the `SD_PREFER_SIBLING` rule) made no difference and was not part of the report.
+- **Correction:** `docs/kernel7-cpu-scheduling.md` said the limit only reached this board because its LLC and
+  asymmetric-capacity domains are the same. That was wrong. Since 7.2 the asymmetric-capacity domain always gets
+  `shared` data (`claim_asym_sched_domain_shared()`), so the limit applies on any big.LITTLE system. The doc is fixed.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.
