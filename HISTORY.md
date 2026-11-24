@@ -683,6 +683,15 @@ Change:
   asymmetric-capacity domains are the same. That was wrong. Since 7.2 the asymmetric-capacity domain always gets
   `shared` data (`claim_asym_sched_domain_shared()`), so the limit applies on any big.LITTLE system. The doc is fixed.
 
+## 2026-11-24: corruption crashes under full-chip build load
+
+- Rebuilding the modules of a CIX-config kernel tree (4,443 modules, each post-processed by `pahole`) crashed the
+  release kernel 5 times out of 5 at 6000 MT/s, cool and with the fan on: hard lockups, stack corruption, kernel
+  Oopses (paging request, NULL, FPAC) and heap corruption in user-space tools.
+- It follows total load: the little cores alone, the big cores alone at up to 2.5 GHz, and all 12 cores capped at
+  1.8 or 2.2 GHz were clean; all 12 at 2.5 GHz or uncapped failed within 1 to 3 minutes. Likely a supply or voltage
+  margin problem; not proven. Write-up: `bench/CRASH-ANALYSIS.md`; reproducer: `bench/crash-repro.sh`.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.
@@ -690,4 +699,6 @@ Change:
   quick-reboot fallback (`sky1_pending` still set after a confirmed boot); CIX display drivers; drop the debug
   patches `0050`/`0051`.
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
+- Corruption crashes under full-chip load (`bench/CRASH-ANALYSIS.md`): find the cause (supply, voltage margin),
+  then decide on a frequency cap for the release.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.
