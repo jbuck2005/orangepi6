@@ -692,6 +692,28 @@ Change:
   1.8 or 2.2 GHz were clean; all 12 at 2.5 GHz or uncapped failed within 1 to 3 minutes. Likely a supply or voltage
   margin problem; not proven. Write-up: `bench/CRASH-ANALYSIS.md`; reproducer: `bench/crash-repro.sh`.
 
+## 2026-11-25: upstream contributions, the 7.3.6 regulator bug, the SIS_UTIL candidate fix
+
+- Issues and PRs sent upstream on 2026-11-24 and 2026-11-25:
+  - cixtech/cix_opensource__npu_driver: issue #2 and PR #3 (V3 `AIPU_IOCTL_FREE_BUF` trusts `desc->asid`).
+  - Arm-China/Compass_NPU_Driver: issue #5 (UMD frees with an uninitialised `aipu_buf_desc`).
+  - Sky1-Linux/linux-sky1: PR #47 (AER storm fix), issue #48 (r8125 warm reboot), comment on #27 (the 7.3.5 port).
+  - cixtech/cix-linux-main: PR #104 (regulator fix below), #103 (AER storm fix), #105 (scheduler stop-gap).
+  - armbian/build: PR #11552 (the same three patches for its `cix-7.3` set).
+- **Linux 7.3.6 breaks ACPI fixed regulators:** a new check at the top of `reg_fixed_voltage_probe()` rejects any
+  device with no device-tree node that isn't named `reg-fixed-voltage`. Every ACPI `PRP0001` fixed regulator fails
+  that check, so on this board the NVMe slot's power switch (`\_SB.PVC0`) never binds and a 7.3.6 kernel built from
+  cixtech/cix-linux-main (and so Armbian's edge kernel) can't find the NVMe root. A one-line fix (let ACPI devices
+  through) made it boot from NVMe; it's PR #104 / armbian #11552. Our own release is on 7.3.5 and isn't affected,
+  but the next 7.3.y update will need the fix.
+- CIX's 7.3 tree with our AER (4016) and scheduler (4017) patches, tested on this board: the AER patch runs on all
+  three root ports (the storm didn't occur on that boot); llama-bench 121.9/35.9 tok/s, the same as 6.18.
+- **SIS_UTIL candidate fix:** a maintainer's reply in the LKML thread scales `nr_idle_scan` up for small LLCs in
+  `update_idle_cpu_scan()`. On 7.3.5 without our 0055, it gives 122.0/35.5 tok/s with SIS_UTIL on and 121.2/35.8 off
+  (stock 109.0/29.5; 6.18 123.5/36.5). Tested-by sent to the thread. 0055 stays until a fix is merged.
+- Full-load crashes (`bench/CRASH-ANALYSIS.md`): all 12 cores capped at 2.2 GHz passed 3 runs; test kernels in this
+  work were built at that cap. A run with another power supply is next.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.
@@ -701,4 +723,6 @@ Change:
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
 - Corruption crashes under full-chip load (`bench/CRASH-ANALYSIS.md`): find the cause (supply, voltage margin),
   then decide on a frequency cap for the release.
+- Next 7.3.y kernel update: add the fixed-regulator ACPI fix (7.3.6 regression above) before moving past 7.3.5.
+- Drop 0055 once a mainline SIS_UTIL fix lands; follow the upstream PRs and issues listed on 2026-11-25.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.
