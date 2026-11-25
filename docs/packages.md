@@ -74,8 +74,8 @@ of skipping it as "already the newest version".
 in `SHA256SUMS`. Separately:
 
 ```bash
-scripts/package-deb.sh from-release v2026.11.24          # the kernel-7 package, from a published release tarball
-KERNEL_TRACK=6.18 scripts/package-deb.sh from-release v2026.11.23
+scripts/package-deb.sh from-release v2026.11.25          # the kernel-7 package, from a published release tarball
+KERNEL_TRACK=6.18 scripts/package-deb.sh from-release v2026.11.25
 scripts/package-deb.sh kernel <tree> <tag>               # from a tree laid out like the release tarball
 scripts/package-deb.sh npu <tag>                         # builds libaipudrv and npu-run; on the board (arm64)
 ```

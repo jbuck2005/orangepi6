@@ -17,7 +17,7 @@ the AER fix `0053` has not yet been seen on a boot that would have stormed. The 
 Known gap: the CIX display drivers (linlon-dp DPU, trilin DP, eDP panel) do not build on 7.x yet,
 so `kernel.conf` turns `DRM_CIX` off on this track (`KCONFIG_EXTRA`). They need the new DRM private-object
 (`atomic_create_state`) and panel allocation APIs. The board runs headless, and Panthor does not
-depend on them. `scripts/setup.sh --prebuilt` installs the v2026.11.24 release kernel.
+depend on them. `scripts/setup.sh --prebuilt` installs the v2026.11.25 release kernel.
 
 ## How the port was made
 
