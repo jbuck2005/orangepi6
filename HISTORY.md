@@ -727,6 +727,24 @@ Change:
   register dump, burst-only counting with re-arm, and the per-line guard). Made by applying 7.3's 0051, 0052,
   0053 and 0057 to the 6.18 driver (offsets only, no fuzz); compile-tested on 6.18.64.
 
+## 2026-11-25: patch parity audit between the two kernel tracks
+
+Every fix of our own on one track, checked against the other (the Sky1-Linux base series differ by design and were
+not compared):
+
+| Fix | 6.18.64 | 7.3.5 | Result |
+|---|---|---|---|
+| AER storm fixes | `post/0003`, `0004`, now `0013` | `0045`, `0049`, `0051`-`0053`, `0057` | same since `post/0013` |
+| r8125: no work at netpoll budget 0 | `post/0002` | missing | **ported** as `patches/7.3/0058` (applies unchanged, compile-tested; only used by `NIC_DRIVER=r8125` builds) |
+| NPU driver 6.2.0 | `post/0012` | `0056` | same; the driver itself drops `IRQF_ONESHOT` on 7.x, so `0046`'s warning doesn't exist on 6.18 |
+| syscore API | `post/0001` | in `0044` | same (each track's own kernel API) |
+| SCMI hwmon sensor id | not needed | `0047` | the bug is in code added in 7.x; 6.18's driver has no sensor-config call |
+| CPPC skip redundant requests | in the LTS series | `0048` | same (`0048` restores the LTS patch on 7.x) |
+| Wakeup scan (SIS_UTIL) | not needed | `0055` | 7.2+ regression; 6.18 has no limit in `select_idle_capacity()` |
+| `SD_PREFER_SIBLING` rule | 6.18 behaviour | `0054` | same (`0054` restores the 6.18 rule) |
+| Reboot-path debug log | none | `0050` (DEBUG) | debug only, not ported; due to be dropped |
+| PERST# kept released on warm reboot | `post/0005` | missing | **open:** it was not the cause of the NIC loss (r8125 was), and 7.3 passes 10/10 warm reboots without it. Either port it or drop it from 6.18; needs a decision and a board test either way |
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.
@@ -736,6 +754,7 @@ Change:
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
 - Corruption crashes under full-chip load (`bench/CRASH-ANALYSIS.md`): find the cause (supply, voltage margin),
   then decide on a frequency cap for the release.
+- Track parity: decide on `post/0005` (PERST# on warm reboot): port to 7.3 or drop from 6.18 (see the 2026-11-25 audit).
 - Next 7.3.y kernel update: add the fixed-regulator ACPI fix (7.3.6 regression above) before moving past 7.3.5.
 - Drop 0055 once a mainline SIS_UTIL fix lands; follow the upstream PRs and issues listed on 2026-11-25.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.
