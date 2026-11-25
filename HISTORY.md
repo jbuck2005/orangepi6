@@ -722,6 +722,10 @@ Change:
   a per-line guard and the stop order reversed: `patches/7.3/0057`, and updated in armbian/build#11552,
   cixtech/cix-linux-main#103 and Sky1-Linux/linux-sky1#47. Compile-tested; the storm path can't be triggered on
   demand. The next release build picks up 0057.
+- Rule from now on: both kernel tracks get the same fixes in parallel. The 6.18 track had only the first two AER
+  fixes, so `patches/6.18.64/post/0013` brings its AER handling to the same state as 7.3 (LTSSM-indication ack,
+  register dump, burst-only counting with re-arm, and the per-line guard). Made by applying 7.3's 0051, 0052,
+  0053 and 0057 to the 6.18 driver (offsets only, no fuzz); compile-tested on 6.18.64.
 
 ## Open items
 
@@ -732,8 +736,6 @@ Change:
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
 - Corruption crashes under full-chip load (`bench/CRASH-ANALYSIS.md`): find the cause (supply, voltage margin),
   then decide on a frequency cap for the release.
-- 6.18 track: its AER guard (`6.18.64/post/0003`) also shares one counter across the lines; port 0057's per-line
-  counter there.
 - Next 7.3.y kernel update: add the fixed-regulator ACPI fix (7.3.6 regression above) before moving past 7.3.5.
 - Drop 0055 once a mainline SIS_UTIL fix lands; follow the upstream PRs and issues listed on 2026-11-25.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.
