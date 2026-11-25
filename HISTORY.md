@@ -714,6 +714,15 @@ Change:
 - Full-load crashes (`bench/CRASH-ANALYSIS.md`): all 12 cores capped at 2.2 GHz passed 3 runs; test kernels in this
   work were built at that cap. A run with another power supply is next.
 
+## 2026-11-25: AER storm guard rework after review
+
+- Armbian's review bot (CodeRabbit) found two real edge cases in the AER storm guard (on #11552): one counter
+  shared by the three AER lines, so a second storming line could slip past the exact-64 cut-off; and the re-arm
+  work cancelled before the interrupts were disabled, so it could be queued again on suspend or remove. Fixed with
+  a per-line guard and the stop order reversed: `patches/7.3/0057`, and updated in armbian/build#11552,
+  cixtech/cix-linux-main#103 and Sky1-Linux/linux-sky1#47. Compile-tested; the storm path can't be triggered on
+  demand. The next release build picks up 0057.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.
@@ -723,6 +732,8 @@ Change:
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
 - Corruption crashes under full-chip load (`bench/CRASH-ANALYSIS.md`): find the cause (supply, voltage margin),
   then decide on a frequency cap for the release.
+- 6.18 track: its AER guard (`6.18.64/post/0003`) also shares one counter across the lines; port 0057's per-line
+  counter there.
 - Next 7.3.y kernel update: add the fixed-regulator ACPI fix (7.3.6 regression above) before moving past 7.3.5.
 - Drop 0055 once a mainline SIS_UTIL fix lands; follow the upstream PRs and issues listed on 2026-11-25.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.
