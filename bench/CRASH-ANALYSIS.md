@@ -63,8 +63,9 @@ Memory 6000 MT/s, fan on, release kernel, `-j6` unless noted. "Clean" = all runs
 
 ## Next steps
 
-1. More runs at the all-12-core 2.2 GHz cap, to know how safe it is; try 2.3 and 2.4 GHz to find the edge.
-2. Power: check the supply (100 W 20 V PD), and measure input current or voltage under the failing load if a USB-C meter
+1. More runs at the all-12-core 2.2 GHz cap, to know how safe it is; try 2.3 and 2.4 GHz to find the edge. The test
+   kernels built on 2026-11-25 (CIX 7.3, SIS_UTIL fix, misfit traces) were all built at 2.2 GHz without a crash.
+2. Power (planned: a run with a different supply): check the supply (100 W 20 V PD), and measure input current or voltage under the failing load if a USB-C meter
    is available. Try another supply.
 3. Firmware: check whether the 2026-10-19 firmware exposes CPU or DDR voltage or power limits.
 4. Report to Orange Pi / CIX with the reproducer if it holds, since a stock Armbian user would hit it on any big
