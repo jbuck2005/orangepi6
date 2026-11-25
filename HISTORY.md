@@ -743,7 +743,17 @@ not compared):
 | Wakeup scan (SIS_UTIL) | not needed | `0055` | 7.2+ regression; 6.18 has no limit in `select_idle_capacity()` |
 | `SD_PREFER_SIBLING` rule | 6.18 behaviour | `0054` | same (`0054` restores the 6.18 rule) |
 | Reboot-path debug log | none | `0050` (DEBUG) | debug only, not ported; due to be dropped |
-| PERST# kept released on warm reboot | `post/0005` | missing | **open:** it was not the cause of the NIC loss (r8125 was), and 7.3 passes 10/10 warm reboots without it. Either port it or drop it from 6.18; needs a decision and a board test either way |
+| PERST# kept released on warm reboot | `post/0005` | not carried | **dropped from 6.18** (see below) |
+
+## 2026-11-25: PERST# warm-reboot patch dropped
+
+- `post/0005` (keep PERST# released on a warm reboot, 2026-11-21) was a candidate fix for the NICs vanishing after
+  a warm reboot. It didn't fix that (the cause was `r8125` at probe; `r8169` fixed it), and 7.3 never carried it.
+  Dropped from the 6.18 track so both tracks behave the same on reboot; 7.3 has no equivalent code (its shutdown
+  hook has no reboot special case). The boot option `sky1_pcie_reboot_perst=` goes with it.
+- Board check: a 6.18.64 test kernel without it (with `post/0013`), 3 rounds of one-shot boot into it and a warm
+  reboot out of it. Every time the firmware trained both NIC root ports ("Root Port 2/3: Link Up Success"), both
+  RTL8125 ports were present on the next boot, and the cabled port came up. `post/0013` regenerated for the new base.
 
 ## Open items
 
@@ -754,7 +764,6 @@ not compared):
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
 - Corruption crashes under full-chip load (`bench/CRASH-ANALYSIS.md`): find the cause (supply, voltage margin),
   then decide on a frequency cap for the release.
-- Track parity: decide on `post/0005` (PERST# on warm reboot): port to 7.3 or drop from 6.18 (see the 2026-11-25 audit).
 - Next 7.3.y kernel update: add the fixed-regulator ACPI fix (7.3.6 regression above) before moving past 7.3.5.
 - Drop 0055 once a mainline SIS_UTIL fix lands; follow the upstream PRs and issues listed on 2026-11-25.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.

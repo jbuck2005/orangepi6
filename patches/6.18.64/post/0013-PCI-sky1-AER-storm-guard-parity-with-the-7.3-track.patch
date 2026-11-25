@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: jbuck2005 <59450931+jbuck2005@users.noreply.github.com>
-Date: Wed, 25 Nov 2026 14:46:37 -0500
+Date: Wed, 25 Nov 2026 15:04:07 -0500
 Subject: [PATCH] PCI: sky1: AER storm guard to parity with the 7.3 track
 
 The 6.18 track had only the first two AER fixes (0003 guard, 0004 latched
@@ -28,7 +28,7 @@ Signed-off-by: jbuck2005 <59450931+jbuck2005@users.noreply.github.com>
  2 files changed, 218 insertions(+), 27 deletions(-)
 
 diff --git a/drivers/pci/controller/cadence/pci-sky1.c b/drivers/pci/controller/cadence/pci-sky1.c
-index 8d0b3ce..d284308 100644
+index 7458797..828ecee 100644
 --- a/drivers/pci/controller/cadence/pci-sky1.c
 +++ b/drivers/pci/controller/cadence/pci-sky1.c
 @@ -11,6 +11,7 @@
@@ -332,7 +332,7 @@ index 8d0b3ce..d284308 100644
  }
  
  static void sky1_pcie_enable_irq(struct sky1_pcie *pcie, bool en)
-@@ -2842,6 +3023,7 @@ static void sky1_pcie_remove(struct platform_device *pdev)
+@@ -2821,6 +3002,7 @@ static void sky1_pcie_remove(struct platform_device *pdev)
  	struct sky1_pcie *pcie = platform_get_drvdata(pdev);
  	struct device *dev = &pdev->dev;
  
