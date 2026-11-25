@@ -240,6 +240,10 @@ Orion O6 / Sky1 XCP boards.
   local IRQ handler, and here it arrives on aer_nf. `0053` acks it from the AER handler the same
   way (AXI slave indication bit, LTSSM status channels, latched bit). The guard stays, but now
   only counts bursts.
+- 2026-11-25, `0057` (from review of the same code on armbian/build#11552): the guard keeps a
+  counter and re-arm state per AER line instead of one shared counter (a second storming line
+  could slip past the exact-64 test), and suspend/remove disable the AER lines before cancelling
+  the re-arm work. Compile-tested only; not yet in a release.
 - Silent hangs under build load: a repeat build on Armbian 6.18.45 at 6000 did not hang, but
   the NVMe's sensor 1 peaked at 87 C and stayed at 80 C or more for about 13 minutes, while the
   CPU sat at 43-45 C. A drive that throttles hard or drops off the bus at that temperature would
