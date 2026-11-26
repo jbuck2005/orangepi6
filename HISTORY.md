@@ -755,6 +755,13 @@ not compared):
   reboot out of it. Every time the firmware trained both NIC root ports ("Root Port 2/3: Link Up Success"), both
   RTL8125 ports were present on the next boot, and the cabled port came up. `post/0013` regenerated for the new base.
 
+## 2026-11-25: full-load crashes don't follow the power supply
+
+- A-B-A swap with the crash reproducer, uncapped: stock 100 W 5 of 5 failed (2026-11-24), a 65 W supply 3 of 5, the
+  stock adapter again 2 of 5. An SSD heatsink fitted in between changed the SSD controller temperature by only a few
+  degrees. So the crashes aren't caused by the external supply; memory or CPU voltage margin under full-chip load is
+  still the lead. Details and the per-run table: `bench/CRASH-ANALYSIS.md`.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.
@@ -762,8 +769,8 @@ not compared):
   quick-reboot fallback (`sky1_pending` still set after a confirmed boot); CIX display drivers; drop the debug
   patches `0050`/`0051`.
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
-- Corruption crashes under full-chip load (`bench/CRASH-ANALYSIS.md`): find the cause (supply, voltage margin),
-  then decide on a frequency cap for the release.
+- Corruption crashes under full-chip load (`bench/CRASH-ANALYSIS.md`): not the external supply (A-B-A test); find
+  the edge between 2.2 and 2.6 GHz, report to Orange Pi, and decide on a frequency cap.
 - Next 7.3.y kernel update: add the fixed-regulator ACPI fix (7.3.6 regression above) before moving past 7.3.5.
 - Drop 0055 once a mainline SIS_UTIL fix lands; follow the upstream PRs and issues listed on 2026-11-25.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.
