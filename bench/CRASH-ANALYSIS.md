@@ -91,7 +91,7 @@ still avoids it (3 of 3 clean). Next: more runs at 2.3-2.5 GHz on all cores to f
 
 ## Firmware and kernel options (research, 2026-11-26)
 
-Desk research; options 1-3 were tested on 2026-11-26 (next section).
+Desk research; options 1-4 were tested on 2026-11-26 (next section).
 
 ### What the stock firmware can and can't change
 
@@ -168,7 +168,7 @@ Desk research; options 1-3 were tested on 2026-11-26 (next section).
 
 The 2.2 GHz cap stays the workaround until one of these explains the failures.
 
-## Tests of options 1-3 (2026-11-26)
+## Tests of options 1-4 (2026-11-26)
 
 Release 7.3.5 kernel, memory 6000 MT/s, stock adapter with the SSD heatsink, all 12 cores uncapped, the same
 reproducer (`bench/crash-repro.sh`, one rebuild of every module per run; a passing run takes about 5.6 min).
@@ -201,13 +201,31 @@ LPI-0/WFI, re-applied after each reboot): **4 of 5 failed**, and faster.
 | 4 | **fail** | 1.2 min | 2 build tools: `malloc(): unsorted double linked list corrupted`, abort |
 | 5 | pass | 5.6 min | |
 
+**4. Memory at 5500 MT/s** (diagnostic only; set in the firmware setup, confirmed from the DMI tables; everything
+else normal): **4 of 5 failed**, no better than 6000.
+
+| Run | Result | Time | Failure |
+|---|---|---|---|
+| 1 | pass | 5.8 min | |
+| 2 | **fail** | 5.3 min | build tools: bus error, illegal instruction, segfault |
+| 3 | **fail** | 1.5 min | build tool heap corruption (`corrupted double-linked list`) |
+| 4 | **fail** | 5.5 min | build tool heap corruption |
+| 5 | **fail** | about 2 min | kernel NULL-pointer Oops on CPU 10, panic |
+
+- Lowering the memory rate didn't help, unlike the Orion O6 report (cixtech/bios#2), so this is not a DRAM or memory
+  controller timing margin at 6000.
+- What's left: the CPU side under sustained full-chip load at full clock speed. All 12 cores capped at 2.2 GHz is the
+  only setting that has never failed. Candidates are the cores' voltage margin (the power firmware's guard band, not
+  settable from Linux) and the A720/A520 errata that a current TF-A applies at reset but CIX's closed BL31 may not.
+  Both are firmware matters: next is option 6, asking Orange Pi / CIX with the reproducer.
+- Memory set back to 6000 MT/s afterwards.
+
 - The HDA driver is not the cause on this board (unlike cix-linux-main#81 on the MS-R1).
 - Keeping the cores out of deep idle made it no better and probably worse (4 of 5, failing within about a minute).
   So it isn't the power-down/wake-up step of idle cores. Keeping every core awake raises the steady load on the
   shared rails instead, which fits a margin problem under sustained full-chip load.
 - Normal config restored: modprobe.d entry removed (module loads), all idle states enabled.
-- Remaining cheap discriminator: option 4 (uncapped runs at 5500 MT/s, as a diagnostic only) separates a memory-rate
-  margin from a CPU one; then option 6 (ask Orange Pi / CIX).
+- Option 4 (5500 MT/s) is above: not the memory rate either. Next: option 6 (ask Orange Pi / CIX).
 
 ## Earlier events that may be the same thing
 
