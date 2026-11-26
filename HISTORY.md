@@ -773,13 +773,17 @@ not compared):
 - Ranked next tests (serial ECC lines, HDA driver blacklisted, deep idle off, a 5500 MT/s diagnostic run,
   `arm64.nomte`, asking Orange Pi / CIX, the reflash): `bench/CRASH-ANALYSIS.md`.
 
-## 2026-11-26: crash tests: no DDR ECC reports, not the HDA driver, not deep idle
+## 2026-11-26: crash tests: no DDR ECC reports, not the HDA driver, not deep idle, not the memory rate
 
 - The firmware's `DDRC IRQ ECC` lines appear in the serial captures only during the 6400 MT/s and old-firmware tests
   (2026-11-18/19), never at 6000 MT/s, so never during the crashes.
 - With `snd_hda_cix_ipbloq` blocked, the reproducer still failed 2 of 5 runs (a hard lockup, a heap corruption).
 - With the deep idle states off, it failed 4 of 5, within about a minute (a hard lockup, broken BTF, heap corruption).
-  Neither is the cause. Next: uncapped runs at 5500 MT/s as a diagnostic. Details: `bench/CRASH-ANALYSIS.md`.
+  Neither is the cause.
+- At 5500 MT/s (diagnostic only, set back to 6000 afterwards) it failed 4 of 5, so it isn't the memory rate either.
+  That leaves the CPU side under sustained full-chip load at full clock: voltage margin or CPU errata in the closed
+  firmware, neither settable from Linux. The 2.2 GHz cap remains the only setting that never failed. Next: ask
+  Orange Pi / CIX with the reproducer. Details: `bench/CRASH-ANALYSIS.md`.
 
 ## Open items
 
@@ -789,7 +793,8 @@ not compared):
   patches `0050`/`0051`.
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
 - Corruption crashes under full-chip load (`bench/CRASH-ANALYSIS.md`): not the external supply (A-B-A test); find
-  the edge between 2.2 and 2.6 GHz, report to Orange Pi, and decide on a frequency cap.
+  the edge between 2.2 and 2.6 GHz, report to Orange Pi / CIX (CPU voltage margin or errata in the firmware), and
+  decide on a frequency cap.
 - Next 7.3.y kernel update: add the fixed-regulator ACPI fix (7.3.6 regression above) before moving past 7.3.5.
 - Drop 0055 once a mainline SIS_UTIL fix lands; follow the upstream PRs and issues listed on 2026-11-25.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.
