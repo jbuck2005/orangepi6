@@ -55,6 +55,40 @@ Memory 6000 MT/s, fan on, release kernel, `-j6` unless noted. "Clean" = all runs
 - Most likely: a supply rail sagging under the combined load (CPU and/or DDR rails, or the 20 V input), or too little
   voltage margin at the top frequencies. **Not proven**; it needs measurements we can't take from software.
 
+## Power supply A-B-A test (2026-11-25)
+
+Same reproducer, all 12 cores uncapped (2.6 GHz top), memory 6000 MT/s, release 7.3.5 kernel. Between the 100 W runs
+of 2026-11-24 and these, a 3 mm aluminium heatsink was fitted to the SSD (same fan, same placement). Each run rebuilds
+every module once; "time" is from the start of the run (run 1 on 65 W started from a cold tree, so it also compiled).
+
+| Supply | Run | Result | Time | Failure |
+|---|---|---|---|---|
+| 100 W stock, fan only (2026-11-24) | 5 runs | 5 failed | 1-6 min | 3 kernel panics (hard lockup, stack corruption, paging Oops), 2 runs with tool heap corruption |
+| 65 W, fan + heatsink | 1 | **fail** | 52 min (cold) | hard LOCKUP on CPUs 3, 6, 10 |
+| 65 W, fan + heatsink | 2 | **fail** | 4.5 min | kernel Oops (paging request) in `resolve_btfids`, panic |
+| 65 W, fan + heatsink | 3 | pass | 6.0 min | |
+| 65 W, fan + heatsink | 4 | **fail** | 2.4 min | kernel Oops (paging request) in `resolve_btfids`, panic |
+| 65 W, fan + heatsink | 5 | pass | 5.7 min | |
+| 100 W stock, fan + heatsink | 1 | pass | 5.7 min | |
+| 100 W stock, fan + heatsink | 2 | pass | 5.6 min | |
+| 100 W stock, fan + heatsink | 3 | **fail** | 2.2 min | 3 tools: `corrupted double-linked list`, segfaults (no kernel crash) |
+| 100 W stock, fan + heatsink | 4 | pass | 5.5 min | |
+| 100 W stock, fan + heatsink | 5 | **fail** | 1.7 min | 2 tools: segfaults (no kernel crash) |
+
+- The failures follow neither supply: 65 W failed 3 of 5, the stock adapter 2 of 5 on the same day. The weaker supply
+  did not make it worse, so an undersized adapter is not the explanation.
+- Fewer failures than on 2026-11-24 (2-3 of 5 against 5 of 5). The heatsink barely changed the SSD controller
+  (sensor 1 averaged 53 C with and without it; maximum 54 C against 57 C), and the CPU stayed below 52 C in every run,
+  so the difference is more likely chance with 5 runs each, or ambient conditions, than cooling.
+- When a run fails, it fails early (1.7-4.5 min, apart from the cold-tree run); runs that pass take 5.5-6 min.
+- The kernel exposes no voltage, current or power sensors on this board (hwmon has temperatures only, `AC` reports
+  online, no USB-PD class), so supply behaviour can't be logged from software.
+- The release build's usual stress test (full from-scratch kernel builds + `stress-ng --vm --verify`, 65 min,
+  uncapped) passed with no errors on the stock adapter. The failure needs this heavier `pahole`/`resolve_btfids` load.
+
+Updated view: memory or CPU voltage margin under full-chip load, independent of the external supply. The 2.2 GHz cap
+still avoids it (3 of 3 clean). Next: more runs at 2.3-2.5 GHz on all cores to find the edge, and a report to Orange Pi.
+
 ## Earlier events that may be the same thing
 
 - The silent hangs and the kernel panic during full kernel builds (2026-11-21), put down to NVMe heat. The fan fixed
@@ -65,7 +99,8 @@ Memory 6000 MT/s, fan on, release kernel, `-j6` unless noted. "Clean" = all runs
 
 1. More runs at the all-12-core 2.2 GHz cap, to know how safe it is; try 2.3 and 2.4 GHz to find the edge. The test
    kernels built on 2026-11-25 (CIX 7.3, SIS_UTIL fix, misfit traces) were all built at 2.2 GHz without a crash.
-2. Power (planned: a run with a different supply): check the supply (100 W 20 V PD), and measure input current or voltage under the failing load if a USB-C meter
+2. Power: an A-B-A swap to a 65 W supply (above) showed it doesn't follow the supply. Measuring the board's own
+   rails under load would still help; measure input current or voltage under the failing load if a USB-C meter
    is available. Try another supply.
 3. Firmware: check whether the 2026-10-19 firmware exposes CPU or DDR voltage or power limits.
 4. Report to Orange Pi / CIX with the reproducer if it holds, since a stock Armbian user would hit it on any big
