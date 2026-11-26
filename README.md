@@ -68,8 +68,9 @@ library as .deb packages (`sudo apt install ./orangepi6-kernel-7_*_arm64.deb`, s
 
 | Release | Kernel | NPU | State |
 |---|---|---|---|
-| [v2026.11.24](../../releases/tag/v2026.11.24) | 7.3.5 | 6.2.0 driver | **Latest**, what `setup.sh --prebuilt` installs; also as .deb packages |
-| [v2026.11.23](../../releases/tag/v2026.11.23) | 6.18.64 LTS | 6.2.0 driver | the LTS alternative (`KERNEL_TRACK=6.18`); also as .deb packages |
+| [v2026.11.25](../../releases/tag/v2026.11.25) | 7.3.5 and 6.18.64 LTS | 6.2.0 driver | **Latest**, both tracks in one release; what `setup.sh --prebuilt` installs (7.3.5, or 6.18.64 with `KERNEL_TRACK=6.18`); also as .deb packages |
+| [v2026.11.24](../../releases/tag/v2026.11.24) | 7.3.5 | 6.2.0 driver | superseded by v2026.11.25 |
+| [v2026.11.23](../../releases/tag/v2026.11.23) | 6.18.64 LTS | 6.2.0 driver | superseded by v2026.11.25 |
 | [v2026.11.22.1](../../releases/tag/v2026.11.22.1) | 6.18.64 LTS | 6.2.0 driver | the same kernel, without packages |
 | [v2026.11.22](../../releases/tag/v2026.11.22) | 7.3.5 | old driver (`setup.sh npu` refuses it) | pre-release, superseded by v2026.11.24 |
 | v2026.11.19.1, v2026.11.19 | 6.18.64, 6.18.14 | old driver | superseded |
@@ -83,7 +84,7 @@ scripts/setup.sh preflight && scripts/setup.sh packages && scripts/setup.sh sour
 #    for the 6.18 LTS kernel instead: KERNEL_TRACK=6.18 in front of each command
 
 # 2. package it: the prebuilt tarball, the patched source, the .deb packages and SHA256SUMS, into ~/sky1-build/release/
-scripts/package-release.sh v2026.11.24         # the release tag; NPU_DEB=0 skips the NPU package
+scripts/package-release.sh v2026.11.25         # the release tag; NPU_DEB=0 skips the NPU package
 ```
 
 `package-release.sh` checks that the shipped source is the one that was built, then calls `scripts/package-deb.sh`,
@@ -100,9 +101,9 @@ which writes:
 The packages can also be made on their own:
 
 ```bash
-scripts/package-deb.sh from-release v2026.11.24          # kernel-7 package from a published release tarball
-KERNEL_TRACK=6.18 scripts/package-deb.sh from-release v2026.11.23
-scripts/package-deb.sh npu v2026.11.24                    # NPU package (on the board, arm64)
+scripts/package-deb.sh from-release v2026.11.25          # kernel-7 package from a published release tarball
+KERNEL_TRACK=6.18 scripts/package-deb.sh from-release v2026.11.25
+scripts/package-deb.sh npu v2026.11.25                    # NPU package (on the board, arm64)
 sha256sum ~/sky1-build/release/*.deb
 ```
 
@@ -203,7 +204,7 @@ boots (`SERIAL=1 scripts/install.sh arm acpi`) use `earlycon=pl011,mmio32,0x040d
 ## Roadmap
 - **Phase 1, GPU:** done (2026-11-18), released as v2026.11.19 and v2026.11.19.1.
 - **Phase 2, NPU:** done (2026-11-22) on an open stack (CIX's 6.2.0 driver, Arm China's open `libaipudrv` 4.1.0),
-  see [docs/npu.md](docs/npu.md). Released in v2026.11.22.1 and v2026.11.23 (6.18.64) and v2026.11.24 (7.3.5).
+  see [docs/npu.md](docs/npu.md). Released in v2026.11.22.1, v2026.11.23 and v2026.11.25 (6.18.64) and v2026.11.24 and v2026.11.25 (7.3.5).
 - **Kernel 7:** 7.3.5 merged as an optional track on 2026-11-22 (pre-release v2026.11.22), proven on the board and
   made the default on 2026-11-24 in v2026.11.24 (CPU gap fixed, NPU driver 6.2.0). 6.18.64 LTS stays available.
 - **Open:** NPU classification checked against ImageNet labels and more hub models; CIX display drivers on 7.x; an

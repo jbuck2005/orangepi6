@@ -1,7 +1,7 @@
 # NPU (Arm China Zhouyi X2) on the Orange Pi 6
 
 Status: **working** (2026-11-22) on 6.18.64 and 7.3.5 (full builds from `main`, the driver loads at boot).
-Released in **v2026.11.24** (7.3.5, the default) and **v2026.11.22.1** and **v2026.11.23** (6.18.64). The 7.3.5
+Released in **v2026.11.25** (both tracks), **v2026.11.24** (7.3.5) and **v2026.11.22.1** and **v2026.11.23** (6.18.64). The 7.3.5
 pre-release v2026.11.22 and earlier releases have the old driver.
 
 ## What the NPU is
