@@ -89,6 +89,85 @@ every module once; "time" is from the start of the run (run 1 on 65 W started fr
 Updated view: memory or CPU voltage margin under full-chip load, independent of the external supply. The 2.2 GHz cap
 still avoids it (3 of 3 clean). Next: more runs at 2.3-2.5 GHz on all cores to find the edge, and a report to Orange Pi.
 
+## Firmware and kernel options (research, 2026-11-26)
+
+Desk research only; nothing below has been run on the board yet.
+
+### What the stock firmware can and can't change
+
+- **No voltage, power-cap or OPP menu.** The Orange Pi firmware's setup pages (CIX System Manager > Soc
+  Configuration) offer, for the CPU, only `LPI Max State`, `CPPC Interface Type` and per-core enables, plus the memory
+  data rate. Nothing for CPU or SoC voltage.
+- **The voltage plan lives in `csu_pm_config.bin`** (a 4 KB flash region read by the power-management firmware in
+  `bootloader1`). Decoded from the 2026-10-19 Orange Pi 6 image (as extracted in
+  [HeyMeco/edk2-cix-sky1](https://github.com/HeyMeco/edk2-cix-sky1) `vendor/orangepi/opi6/`, format v3.2):
+
+  | Rail | Regulator | Power cap | Boot voltage | Guard band (`delta_mV`) |
+  |---|---|---|---|---|
+  | CPU little (A520 x4) | fixed | 2.5 W | 815 mV | +25 mV |
+  | CPU mid 0 / mid 1 (A720) | MP2845 buck 2 (shared) | 6.5 W each | 790 mV | +30 mV |
+  | CPU big 0 / big 1 (A720) | MP2845 buck 3 (shared) | 8 W each | 790 mV | +30 mV |
+  | DSU (L3, cluster logic) | fixed | 5.5 W | 815 mV | +15 mV |
+  | GPU | MP2845 buck 1 | 12 W | 790 mV | +20 mV |
+  | SoC | MP2845 buck 0 | 9 W | 790 mV | +15 mV |
+
+  The guard band is added to every OPP voltage by the power firmware. The OPP table itself is not in this file (it
+  is built into `bootloader1`), and the newer `bootloader1` builds no longer take OPP overrides from it
+  ([cixtech/bios#4](https://github.com/cixtech/bios/issues/4)); whether they still honour `delta_mV` is not known.
+  The DSU and little-core rails are fixed regulators, so firmware can't raise them at all. The kernel can't set any
+  of these: frequencies go through SCMI and the voltages are chosen by the power firmware.
+- **Raising `delta_mV`** (e.g. +30 to +50 mV on the big and mid rails) would be the direct test of the voltage
+  theory, but it means editing and reflashing the SPI flash (the region is CRC-protected; the CIX `pm_config`
+  generator rebuilds it byte-identically). A bad flash needs a 1.8 V SPI programmer to recover. Not worth trying
+  before the cheap tests below.
+- **Other firmware.** No Orange Pi release newer than 2026-10-19 is known.
+  [Neol00/edk2-cix-unlocked](https://github.com/Neol00/edk2-cix-unlocked) has a voltage/OPP/TDP menu, but only for
+  the Orion O6 and only with an old `bootloader1` signed with a different key, so it can't run on this board.
+  HeyMeco's tree boot-tests on the Orange Pi 6 but reuses the vendor `bootloader1` and `csu_pm_config.bin`, so it
+  adds no voltage control.
+
+### Other reports that look like this one
+
+- [cixtech/bios#2](https://github.com/cixtech/bios/issues/2), Orion O6 at 6000 MT/s: intermittent `pahole`/BTF
+  failures, `llvm-ar` segfaults and `free(): invalid pointer` during kernel builds, gone on retry. A CIX
+  collaborator said an early O6 with similar trouble was fixed by lowering the memory rate, and Radxa's firmware 1.3.0
+  lowered the O6 from 6000 to 5500. Separately, MTE misbehaved until an MTE option was enabled in the firmware.
+- [cixtech/cix-linux-main#81](https://github.com/cixtech/cix-linux-main/issues/81), MS-R1: the compiler segfaults
+  in every kernel build on CIX-patched kernels. The reporter's corruption stopped after disabling
+  `CONFIG_SND_HDA_CIX_IPBLOQ` (`CONFIG_CIX_DST` was not enough). Our kernels build `CONFIG_SND_HDA_CIX_IPBLOQ=m`
+  and have no `CIX_DST`. [cix-linux-main#70](https://github.com/cixtech/cix-linux-main/issues/70) (Orange Pi 6
+  Plus) also saw HDA DMA errors before memory corruption.
+- [cixtech/bios#5](https://github.com/cixtech/bios/issues/5), another MS-R1: DRAM corruption at one fixed spot even
+  at 3200 MT/s and on kernels with no CIX patches, which looks like a faulty unit rather than this pattern.
+- CPU errata: CIX's public TF-A (v2.7, June 2022) has only pre-release support for the A720 ("cortex_hunter") and
+  A520 ("cortex_hayes") with no errata workarounds. Current TF-A applies, for A720 r0p0-r0p1, 2792132 (loads crossing
+  a 4 KiB boundary may return corrupt data) and 2940794 (a load crossing a 64-byte boundary may return corrupt data),
+  and for A520 3685825 (a CAS may lose its write). These are set in EL3 at reset, so Linux can't apply them, and
+  whether CIX's closed BL31 sets them is not known.
+  ([Neol00/edk2-cix-unlocked#9](https://github.com/Neol00/edk2-cix-unlocked/issues/9) lists them.)
+
+### Options, ranked (benefit for the risk)
+
+1. **Check the serial captures for firmware DDR ECC lines** (`DDRC IRQ ECC_SBE` / `ECC_DBE`) around the failing runs.
+   The firmware reported these in the 2026-11-18 memory tests. None near the crashes points away from the DRAM and
+   towards the CPU side; any near them points at the 6000 MT/s rate. No risk.
+2. **Uncapped runs with `snd_hda_cix_ipbloq` blacklisted** (5 runs). Matches #81 and #70; a DMA fault would also
+   explain corruption on idle CPUs. One modprobe line, reversible. A pass would also argue against the voltage theory.
+3. **Uncapped runs with deep idle states off** (`cpupower idle-set -D 0`, or the firmware's `LPI Max State`). Three
+   of the crashes hit idle CPUs (hard lockup on CPUs 1, 8 and 10; stack corruption on idle CPU 10), and many cores
+   leaving power-down at once is the largest load step a shared buck sees. Runtime setting, reversible.
+4. **Uncapped runs at 5500 MT/s, as a diagnostic only** (not a setting to keep). Tells a memory-controller margin
+   problem at 6000 from a CPU one: the O6 report above was cured that way. Needs a firmware-menu change at the
+   keyboard over the serial console.
+5. **`arm64.nomte` on the kernel command line** (if `/proc/cpuinfo` lists `mte`), for one test set, after the O6
+   MTE report. Reversible.
+6. **Ask Orange Pi / CIX** with the reproducer: whether the closed BL31 applies the A720/A520 errata above, and for
+   a firmware build with a larger CPU guard band. No risk, slow.
+7. **Edit `delta_mV` in `csu_pm_config.bin` and reflash.** The only real voltage lever, but untested on this
+   firmware generation and needs an SPI programmer as a fallback. Last resort.
+
+The 2.2 GHz cap stays the workaround until one of these explains the failures.
+
 ## Earlier events that may be the same thing
 
 - The silent hangs and the kernel panic during full kernel builds (2026-11-21), put down to NVMe heat. The fan fixed
@@ -102,7 +181,8 @@ still avoids it (3 of 3 clean). Next: more runs at 2.3-2.5 GHz on all cores to f
 2. Power: an A-B-A swap to a 65 W supply (above) showed it doesn't follow the supply. Measuring the board's own
    rails under load would still help; measure input current or voltage under the failing load if a USB-C meter
    is available. Try another supply.
-3. Firmware: check whether the 2026-10-19 firmware exposes CPU or DDR voltage or power limits.
+3. Firmware: the 2026-10-19 firmware exposes no CPU or DDR voltage or power settings (see "Firmware and kernel
+   options" above for the ranked tests instead).
 4. Report to Orange Pi / CIX with the reproducer if it holds, since a stock Armbian user would hit it on any big
    parallel build.
 5. Decide whether the release should ship a frequency cap (a boot setting) until the cause is known.
