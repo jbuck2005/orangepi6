@@ -762,6 +762,25 @@ not compared):
   degrees. So the crashes aren't caused by the external supply; memory or CPU voltage margin under full-chip load is
   still the lead. Details and the per-run table: `bench/CRASH-ANALYSIS.md`.
 
+## 2026-11-26: firmware and kernel options for the full-load crashes (research)
+
+- The stock firmware has no CPU voltage, power-cap or OPP settings. Decoding its `csu_pm_config.bin` shows the CPU
+  rails get a +30 mV guard band (big and mid), the DSU and little rails are fixed regulators, and per-cluster power
+  caps are 6.5-8 W. Raising the guard band needs a reflash, so it is the last resort.
+- Similar reports: an Orion O6 at 6000 MT/s with the same `pahole`/BTF build failures (fixed there by a lower memory
+  rate), and an MS-R1 whose build segfaults stopped after disabling `snd_hda_cix_ipbloq`. CIX's TF-A carries no
+  A720/A520 errata workarounds.
+- Ranked next tests (serial ECC lines, HDA driver blacklisted, deep idle off, a 5500 MT/s diagnostic run,
+  `arm64.nomte`, asking Orange Pi / CIX, the reflash): `bench/CRASH-ANALYSIS.md`.
+
+## 2026-11-26: crash tests: no DDR ECC reports, not the HDA driver, not deep idle
+
+- The firmware's `DDRC IRQ ECC` lines appear in the serial captures only during the 6400 MT/s and old-firmware tests
+  (2026-11-18/19), never at 6000 MT/s, so never during the crashes.
+- With `snd_hda_cix_ipbloq` blocked, the reproducer still failed 2 of 5 runs (a hard lockup, a heap corruption).
+- With the deep idle states off, it failed 4 of 5, within about a minute (a hard lockup, broken BTF, heap corruption).
+  Neither is the cause. Next: uncapped runs at 5500 MT/s as a diagnostic. Details: `bench/CRASH-ANALYSIS.md`.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.
