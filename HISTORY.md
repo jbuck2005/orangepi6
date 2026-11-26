@@ -773,6 +773,14 @@ not compared):
 - Ranked next tests (serial ECC lines, HDA driver blacklisted, deep idle off, a 5500 MT/s diagnostic run,
   `arm64.nomte`, asking Orange Pi / CIX, the reflash): `bench/CRASH-ANALYSIS.md`.
 
+## 2026-11-26: crash tests: no DDR ECC reports, not the HDA driver, not deep idle
+
+- The firmware's `DDRC IRQ ECC` lines appear in the serial captures only during the 6400 MT/s and old-firmware tests
+  (2026-11-18/19), never at 6000 MT/s, so never during the crashes.
+- With `snd_hda_cix_ipbloq` blocked, the reproducer still failed 2 of 5 runs (a hard lockup, a heap corruption).
+- With the deep idle states off, it failed 4 of 5, within about a minute (a hard lockup, broken BTF, heap corruption).
+  Neither is the cause. Next: uncapped runs at 5500 MT/s as a diagnostic. Details: `bench/CRASH-ANALYSIS.md`.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.

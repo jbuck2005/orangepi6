@@ -91,7 +91,7 @@ still avoids it (3 of 3 clean). Next: more runs at 2.3-2.5 GHz on all cores to f
 
 ## Firmware and kernel options (research, 2026-11-26)
 
-Desk research only; nothing below has been run on the board yet.
+Desk research; options 1-3 were tested on 2026-11-26 (next section).
 
 ### What the stock firmware can and can't change
 
@@ -167,6 +167,47 @@ Desk research only; nothing below has been run on the board yet.
    firmware generation and needs an SPI programmer as a fallback. Last resort.
 
 The 2.2 GHz cap stays the workaround until one of these explains the failures.
+
+## Tests of options 1-3 (2026-11-26)
+
+Release 7.3.5 kernel, memory 6000 MT/s, stock adapter with the SSD heatsink, all 12 cores uncapped, the same
+reproducer (`bench/crash-repro.sh`, one rebuild of every module per run; a passing run takes about 5.6 min).
+
+**1. Firmware DDR ECC lines in the serial captures.** The capture (since 2026-11-18) has 2,567 `DDRC IRQ ECC` lines
+(`ECC_SBE_WR`, `ECC_SBE_RD`, `ECC_DBE_RD`). All of them are from 2026-11-18 and 2026-11-19, the old-firmware and
+6400 MT/s tests; the last one is at 19:53 on 2026-11-19 during a 6400 MT/s load run. None appear after the switch to
+6000 MT/s on 2026-11-20, so none during any crash or failed run of 2026-11-24 to 2026-11-26. Either the corruption is
+not in the DRAM, or the firmware's ECC report doesn't catch it at 6000.
+
+**2. `snd_hda_cix_ipbloq` blocked** (`install snd_hda_cix_ipbloq /bin/false` and `blacklist` in modprobe.d; confirmed
+not loaded after a reboot): **2 of 5 failed**, the same as without the block.
+
+| Run | Result | Time | Failure |
+|---|---|---|---|
+| 1 | **fail** | 2.2 min | hard LOCKUP on CPUs 0 and 8, panic |
+| 2 | pass | 5.7 min | |
+| 3 | pass | 5.7 min | |
+| 4 | pass | 5.6 min | |
+| 5 | **fail** | 4.3 min | build tool heap corruption (`corrupted size vs. prev_size`) |
+
+**3. Deep idle states off** (module loading again; sysfs: `disable=1` on LPI-1 and LPI-2 of every CPU, leaving only
+LPI-0/WFI, re-applied after each reboot): **4 of 5 failed**, and faster.
+
+| Run | Result | Time | Failure |
+|---|---|---|---|
+| 1 | **fail** | 2.3 min | hard LOCKUP on CPUs 6 and 10, panic |
+| 2 | **fail** | 0.8 min | `pahole` produced broken BTF ("Error emitting field") and the build stopped |
+| 3 | **fail** | 0.9 min | 3 build tools: heap corruption, segfault |
+| 4 | **fail** | 1.2 min | 2 build tools: `malloc(): unsorted double linked list corrupted`, abort |
+| 5 | pass | 5.6 min | |
+
+- The HDA driver is not the cause on this board (unlike cix-linux-main#81 on the MS-R1).
+- Keeping the cores out of deep idle made it no better and probably worse (4 of 5, failing within about a minute).
+  So it isn't the power-down/wake-up step of idle cores. Keeping every core awake raises the steady load on the
+  shared rails instead, which fits a margin problem under sustained full-chip load.
+- Normal config restored: modprobe.d entry removed (module loads), all idle states enabled.
+- Remaining cheap discriminator: option 4 (uncapped runs at 5500 MT/s, as a diagnostic only) separates a memory-rate
+  margin from a CPU one; then option 6 (ask Orange Pi / CIX).
 
 ## Earlier events that may be the same thing
 
