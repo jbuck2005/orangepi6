@@ -785,6 +785,14 @@ not compared):
   firmware, neither settable from Linux. The 2.2 GHz cap remains the only setting that never failed. Next: ask
   Orange Pi / CIX with the reproducer. Details: `bench/CRASH-ANALYSIS.md`.
 
+## 2026-11-27: RMA evidence: stock kernel fails too; missing CPU errata aren't the cause
+
+- Armbian's own stock kernel (6.18.45, none of our patches) failed the reproducer 4 of 5 times (three `Oops - FPAC`,
+  one panic, one hang); our 6.18.64 release kernel 3 of 5. The failure follows the board, not our kernels.
+- `stress-ng --verify` (cpu, matrix, vm) and memtester on all 12 cores passed with no errors.
+- CIX's BL31 applies none of the A720/A520 errata workarounds (read on every core through a CIX SiP call). Setting
+  them all at runtime didn't help (4 of 5 still failed). Details: `bench/CRASH-ANALYSIS.md`.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.

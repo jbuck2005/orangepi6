@@ -1,0 +1,1 @@
+obj-m := errata_probe.o

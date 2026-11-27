@@ -227,6 +227,46 @@ else normal): **4 of 5 failed**, no better than 6000.
 - Normal config restored: modprobe.d entry removed (module loads), all idle states enabled.
 - Option 4 (5500 MT/s) is above: not the memory rate either. Next: option 6 (ask Orange Pi / CIX).
 
+## RMA evidence tests (2026-11-26 to 2026-11-27)
+
+Same reproducer, all 12 cores uncapped (2.6 GHz top), memory 6000 MT/s (checked from the DMI tables), stock 100 W
+adapter, SSD heatsink fitted. The SSD fan was off from 2026-11-27 12:13 UTC (factory-like) and at 5 V from 13:24 UTC.
+
+**A stock kernel with none of this repo's patches fails too.** Armbian's own `6.18.45-current-arm64` (the kernel of
+the stock Armbian image, booted one-shot from GRUB entry 0, `cppc_cpufreq`, up to 2.6 GHz): **4 of 5 failed.**
+
+| Run | Result | Time | Failure |
+|---|---|---|---|
+| 1 | **fail** | 4.9 min | `Oops - FPAC` in `pahole` (CPU 0), more Oopses on CPU 1, fatal panic in interrupt, hung (no `panic=` on that kernel) |
+| 2 | **fail** | 4.6 min | `Oops - FPAC` in `resolve_btfids` (CPU 1); the build then stalled |
+| 3 | pass | 5.4 min | |
+| 4 | **fail** | 0.7 min | `Oops - FPAC` in `resolve_btfids` (CPU 0), "Fixing recursive fault but reboot is needed!", hung |
+| 5 | **fail** | 0.7 min | 2 build tools: heap corruption (with `kernel.panic=10`, `panic_on_oops=1` set) |
+
+**This repo's 6.18.64 LTS release kernel** (v2026.11.25 package; SSD fan off): **3 of 5 failed** (build-tool
+crashes at 1.4 and 2.2 min; `Oops - FPAC` in `resolve_btfids` on CPU 10 and a fatal panic at about 3 min; two passes).
+The SSD controller (sensor 1) reached 90 C with the fan off; the CPU stayed below 57 C.
+
+**Self-checking stress without a compiler** (kernel 7.3.5, uncapped, 8 min each): `stress-ng --verify` with
+`--cpu 12 --cpu-method all`, `--matrix 12` and `--vm 12 --vm-bytes 75% --vm-method all` passed 12 of 12 each, and 12
+memtester instances of 700 MB (one pinned to each core, one loop) finished with 0 failures. So the failure needs the
+`pahole`/`resolve_btfids` load; standard stress tools don't show it.
+
+**CPU errata.** CIX's TF-A sources carry no Cortex-A720/A520 errata code, but have a non-secure SiP call
+(`0xc200000e`, `CIX_SIP_PI_TEST_ENABLE`) that opens the CPUACTLR registers to the kernel. With it, a test module read
+them on every core (MIDR: A720 `0x410fd811` r0p1, A520 `0x410fd801` r0p1):
+- **All the workaround bits a current TF-A sets at reset were 0 on all 12 cores**: A720 2729604 (CPUACTLR[61:60]),
+  2792132 (CPUACTLR2[26]) and 2940794 (CPUACTLR2[37]); A520 3685825 (CPUACTLR[9]) and 3631357 (CPUACTLR[27]). The
+  shipped BL31 (`v2.7(debug):Beta_2.1.5_release`) doesn't apply them.
+- With all of them set on every core (confirmed 12 of 12 before each run and still set after the last), and deep idle
+  off so a core power-down couldn't clear them: **4 of 5 still failed** (segfault 2.5 min, bus error 3.3 min, heap
+  corruption 3.4 and 3.2 min), the same as the 4 of 5 baseline with deep idle off. The missing errata are real but
+  are not the cause.
+
+What's left after every software-side test: the CPU side under sustained all-core load at full clock speed, most
+likely voltage margin at the top operating points, which only the power firmware sets. All 12 cores capped at
+2.2 GHz is still the only setting that has never failed.
+
 ## Earlier events that may be the same thing
 
 - The silent hangs and the kernel panic during full kernel builds (2026-11-21), put down to NVMe heat. The fan fixed
