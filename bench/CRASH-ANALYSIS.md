@@ -311,6 +311,33 @@ the edge for the big pairs lies between 2.4 and 2.5 GHz. A 2.4 GHz cap on those 
 cpu10-11) would be a lighter workaround than 2.2 GHz, but it rests on 5 runs only; the documented workaround stays
 at 2.2 GHz until more runs back the 2.4 GHz one.
 
+## Weak-core hunt and clock steps (2026-11-27 evening)
+
+Release 7.3.5 kernel, memory 6000 MT/s, deep idle normal, SSD heatsink and fan at 5 V, all 12 cores loaded
+(`CPUS=0-11 J=6`), per-policy caps set by hand (`scaling_max_freq`, read back exactly and confirmed under load from
+the logged clock of cpu0), `panic_on_oops=1`, caps re-applied after every crash reboot, one run per rebuild of every
+module.
+
+| Set | policy0 (cpu0-1) | policy10 (cpu10-11) | Runs | Failed | Failures |
+|---|---|---|---|---|---|
+| 1a | 2.6 GHz (full) | 2.2 GHz | 5 | **0** | |
+| 1b | 2.2 GHz | 2.5 GHz (full) | 5 | **4** | 3 kernel panics within 2 min (2x stack corruption, 1 Oops), 1 run with build-tool crashes at 1.7 min |
+| 2a | 2.5 GHz | 2.5 GHz | 5 | **3** | build-tool crashes at 1.2 and 5 min, 1 kernel panic at about 4 min |
+| 2b | 2.45 GHz | 2.45 GHz | 5 | **3** | 1 kernel panic (Oops) at about 4 min, build-tool crashes at 4.3 and 2.4 min |
+| 3 | 2.4 GHz | 2.4 GHz | 20 | **0** | all 20 clean, 5.6 min each |
+
+Mid pairs (cpu6-9) and the A520s at full speed in every set. CPU at most 55 C; SSD controller about 64-67 C.
+
+- **The weak pair is cpu10-11 (policy10).** The fastest pair, cpu0-1 at its full 2.6 GHz, passed 5 of 5 with
+  cpu10-11 capped; cpu10-11 at its full 2.5 GHz failed 4 of 5 with cpu0-1 capped.
+- **Its edge is between 2.40 and 2.45 GHz** under this load: 2.45 GHz failed 3 of 5, and 2.4 GHz passed 20 of 20
+  (plus 5 of 5 earlier the same day), 25 clean runs in all.
+- A one-pair problem fits a part whose cpu10-11 pair has too little voltage margin at its rated 2.5 GHz on this unit,
+  more than a board-wide supply issue: the other big pair shares the same regulator and is fine at 2.6 GHz.
+- Lightest workaround the data supports: cap cpu10-11 alone at 2.4 GHz (4% off that pair, nothing off the rest).
+  The documented workaround (2.2 GHz on cpu0, 1, 10 and 11) stays until a set with only cpu10-11 at 2.4 GHz and
+  everything else at full speed has been run.
+
 ## Earlier events that may be the same thing
 
 - The silent hangs and the kernel panic during full kernel builds (2026-11-21), put down to NVMe heat. The fan fixed

@@ -817,6 +817,13 @@ not compared):
 - README and INSTALL note that 2.4 GHz also passed; the advice stays at 2.2 GHz. Crash findings added to the
   index above; open items updated.
 
+## 2026-11-27: the weak cores are cpu10-11, edge between 2.40 and 2.45 GHz
+
+- Overnight sets on the release 7.3.5 kernel (all cores loaded): cpu0-1 at full 2.6 GHz with cpu10-11 capped,
+  0 of 5 failed; cpu10-11 at full 2.5 GHz with cpu0-1 capped, 4 of 5 failed. Both pairs at 2.5 GHz failed 3 of 5,
+  at 2.45 GHz 3 of 5, at 2.4 GHz 0 of 20. So one core pair (cpu10-11, policy10) lacks margin at its rated 2.5 GHz on
+  this unit. Details: `bench/CRASH-ANALYSIS.md`. Next: cpu10-11 alone at 2.4 GHz as the lightest workaround.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.
