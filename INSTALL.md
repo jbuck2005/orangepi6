@@ -124,6 +124,14 @@ pre-release v2026.11.22, have the older driver, which the library does not work 
   without one, every power cut resets the firmware settings, so memory drops back to its default speed and the
   "power on after AC loss" setting turns off, and the board then stays off after the plug comes back on. (`scripts/nic-power.sh`, which switches the NIC rails
   through GPIO038/039, is experimental: it froze the board under Armbian.)
+- **Heavy full-chip load can corrupt memory.** Rebuilding every module of a large kernel tree (each post-processed
+  by `pahole`) on all 12 cores at full speed makes build tools crash, and sometimes the kernel, within minutes (2 to 5
+  of 5 runs failed, on both kernels and on Armbian's stock kernel). It needs the four big A720 cores (cpu0-1 at
+  2.6 GHz, cpu10-11 at 2.5 GHz) at full speed: with only those capped at 2.2 GHz, 0 of 5 runs failed (a small
+  sample). Ordinary use, our own kernel builds and `stress-ng` don't trigger it. If you hit unexplained crashes under
+  such load, cap the big cores until the next boot:
+  `echo 2200000 | sudo tee /sys/devices/system/cpu/cpu{0,1,10,11}/cpufreq/scaling_max_freq`.
+  Details: [bench/CRASH-ANALYSIS.md](bench/CRASH-ANALYSIS.md).
 - **Cool the NVMe SSD.** On a bare board the M.2 slot gets no airflow. Under heavy disk load (a full kernel build)
   the controller of a heatsink-less SSD reached 97-100 C on our board, and we saw a hang and a kernel panic during
   such builds. With a small fan blowing across the SSD it stayed around 50 C and an 8-hour build-and-memory-stress

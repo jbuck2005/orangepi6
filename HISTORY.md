@@ -793,6 +793,16 @@ not compared):
 - CIX's BL31 applies none of the A720/A520 errata workarounds (read on every core through a CIX SiP call). Setting
   them all at runtime didn't help (4 of 5 still failed). Details: `bench/CRASH-ANALYSIS.md`.
 
+## 2026-11-27: crash workaround narrowed to the big A720 cores
+
+- Per-cluster caps (release 7.3.5 kernel, 5 runs each): only the big pairs (cpu0-1 at 2.6 GHz, cpu10-11 at 2.5 GHz)
+  capped at 2.2 GHz with everything else at full speed: 0 of 5 failed. Only the mid pairs capped with the big pairs at
+  full speed: 4 of 5 failed (3 kernel panics). The failure needs the big cores at their top speeds, which share one
+  regulator; this points at voltage margin on that rail.
+- The workaround (README, INSTALL, release v2026.11.25 notes, `bench/CRASH-ANALYSIS.md`) now caps only
+  `cpu{0,1,10,11}` at 2.2 GHz instead of every policy. It is a sysfs setting, the same on both kernel tracks.
+  `bench/crash-repro.sh` gained `MAXF_CPUS` to cap only chosen CPUs.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.
@@ -800,9 +810,9 @@ not compared):
   quick-reboot fallback (`sky1_pending` still set after a confirmed boot); CIX display drivers; drop the debug
   patches `0050`/`0051`.
 - Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
-- Corruption crashes under full-chip load (`bench/CRASH-ANALYSIS.md`): not the external supply (A-B-A test); find
-  the edge between 2.2 and 2.6 GHz, report to Orange Pi / CIX (CPU voltage margin or errata in the firmware), and
-  decide on a frequency cap.
+- Corruption crashes under full-chip load (`bench/CRASH-ANALYSIS.md`): not the external supply (A-B-A test); it
+  needs the big A720 pairs at 2.5/2.6 GHz; more runs at the big-pairs cap, find its edge (2.3/2.4 GHz), follow up
+  with CIX on the big-core voltage margin, and decide whether to ship the cap as a boot setting.
 - Next 7.3.y kernel update: add the fixed-regulator ACPI fix (7.3.6 regression above) before moving past 7.3.5.
 - Drop 0055 once a mainline SIS_UTIL fix lands; follow the upstream PRs and issues listed on 2026-11-25.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.

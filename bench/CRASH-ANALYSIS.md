@@ -1,6 +1,8 @@
 # Failure analysis: corruption crashes under full-chip load (2026-11-24)
 
-Status: **open**. Reproducible in about 1 to 3 minutes. Avoided so far by capping every core at 2.2 GHz.
+Status: **open**. Reproducible in about 1 to 3 minutes. Avoided by capping the four big A720 cores (cpu0-1 and
+cpu10-11) at 2.2 GHz; see [Per-cluster caps](#per-cluster-caps-2026-11-27). Until 2026-11-27 the workaround capped
+every core.
 
 ## Symptom
 
@@ -166,7 +168,8 @@ Desk research; options 1-4 were tested on 2026-11-26 (next section).
 7. **Edit `delta_mV` in `csu_pm_config.bin` and reflash.** The only real voltage lever, but untested on this
    firmware generation and needs an SPI programmer as a fallback. Last resort.
 
-The 2.2 GHz cap stays the workaround until one of these explains the failures.
+The 2.2 GHz cap stays the workaround until one of these explains the failures (narrowed to the big A720 pairs on
+2026-11-27, below).
 
 ## Tests of options 1-4 (2026-11-26)
 
@@ -267,6 +270,40 @@ What's left after every software-side test: the CPU side under sustained all-cor
 likely voltage margin at the top operating points, which only the power firmware sets. All 12 cores capped at
 2.2 GHz is still the only setting that has never failed.
 
+## Per-cluster caps (2026-11-27)
+
+Same reproducer and setup as above (release 7.3.5 kernel, memory 6000 MT/s, stock adapter, SSD heatsink, SSD fan at
+5 V), 5 runs each, with only some cpufreq policies capped at 2.2 GHz and the rest at their full speed. The policies
+on this board (the same on 6.18.64 and 7.3.5):
+
+| Policy | CPUs | Top speed | Group | Regulator (firmware power table) |
+|---|---|---|---|---|
+| policy0 | 0, 1 | 2.6 GHz | A720 big | big-core rail (shared) |
+| policy10 | 10, 11 | 2.5 GHz | A720 big | big-core rail (shared) |
+| policy6 | 6, 7 | 2.3 GHz | A720 mid | mid-core rail (shared) |
+| policy8 | 8, 9 | 2.2 GHz | A720 mid | mid-core rail (shared) |
+| policy2 | 2-5 | 1.8 GHz | A520 little | fixed |
+
+| Capped at 2.2 GHz | At full speed | Failed | Details |
+|---|---|---|---|
+| big pairs (cpu0-1, 10-11) | mid pairs, littles | **0 of 5** | all clean, 5.6-5.8 min each |
+| mid pairs (cpu6-9) | big pairs (2.6 / 2.5 GHz), littles | **4 of 5** | 3 kernel panics (stack corruption, 2x `Oops - FPAC`), 1 build-tool crash |
+
+- The failure needs the big A720 pairs at their top speeds while the rest of the chip is busy. The mid pairs and
+  the littles at full speed are fine with the big pairs capped.
+- The second set is close to uncapped: policy8 tops out at 2.2 GHz anyway, so it only lowered cpu6-7 from 2.3 GHz.
+  It shows the failure doesn't need the mid pairs fast, and is a control for the first set rather than its mirror.
+- 5 runs each is a small sample: 0 of 5 against an uncapped baseline of 2-5 of 5 is a clear difference, but not proof
+  that the narrow cap never fails. More runs at it will follow in later test sets.
+- **New workaround:** cap only the big pairs (12-15% off their top speed). The speed gain over the all-core cap is
+  small: that cap also slowed only cpu6-7 (2.3 to 2.2 GHz), since cpu8-9 and the littles already top out at or below
+  2.2 GHz. Its value is that it names the cores at fault. The command:
+  `echo 2200000 | sudo tee /sys/devices/system/cpu/cpu{0,1,10,11}/cpufreq/scaling_max_freq` (until the next boot).
+  It names the CPUs, not the policies, so it doesn't depend on policy numbering. In the reproducer:
+  `MAXF=2200000 MAXF_CPUS=0,1,10,11`.
+- Together with the earlier tests this points at voltage margin on the big-core rail at 2.5-2.6 GHz under all-core
+  load, a power-firmware setting.
+
 ## Earlier events that may be the same thing
 
 - The silent hangs and the kernel panic during full kernel builds (2026-11-21), put down to NVMe heat. The fan fixed
@@ -275,8 +312,9 @@ likely voltage margin at the top operating points, which only the power firmware
 
 ## Next steps
 
-1. More runs at the all-12-core 2.2 GHz cap, to know how safe it is; try 2.3 and 2.4 GHz to find the edge. The test
-   kernels built on 2026-11-25 (CIX 7.3, SIS_UTIL fix, misfit traces) were all built at 2.2 GHz without a crash.
+1. More runs at the big-pairs-only 2.2 GHz cap, to know how safe it is; try 2.3 and 2.4 GHz on the big pairs to
+   find the edge. The test kernels built on 2026-11-25 (CIX 7.3, SIS_UTIL fix, misfit traces) were all built at the
+   all-core 2.2 GHz cap without a crash.
 2. Power: an A-B-A swap to a 65 W supply (above) showed it doesn't follow the supply. Measuring the board's own
    rails under load would still help; measure input current or voltage under the failing load if a USB-C meter
    is available. Try another supply.
@@ -284,7 +322,7 @@ likely voltage margin at the top operating points, which only the power firmware
    options" above for the ranked tests instead).
 4. Report to Orange Pi / CIX with the reproducer if it holds, since a stock Armbian user would hit it on any big
    parallel build.
-5. Decide whether the release should ship a frequency cap (a boot setting) until the cause is known.
+5. Decide whether the release should ship the big-pairs frequency cap (a boot setting) until the cause is known.
 
 ## Logs
 

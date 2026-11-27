@@ -172,6 +172,14 @@ Details: [bench/MEMORY-AB-REPORT.md](bench/MEMORY-AB-REPORT.md), [docs/npu.md](d
   sky1 kernel made the firmware fail PCIe link training for both RTL8125s (`ip -br link` shows only `lo`, even on
   Armbian) until a 30 s power cut. The sky1 kernel now uses `r8169`, which doesn't do this. If you still see it
   (for example after an `r8125` build), a second warm reboot or a power cut recovers.
+- **Heavy full-chip load can corrupt memory.** Rebuilding every module of a large kernel tree (each post-processed
+  by `pahole`) on all 12 cores at full speed makes build tools crash, and sometimes the kernel, within minutes (2 to 5
+  of 5 runs failed, on both kernels and on Armbian's stock kernel). It needs the four big A720 cores (cpu0-1 at
+  2.6 GHz, cpu10-11 at 2.5 GHz) at full speed: with only those capped at 2.2 GHz, 0 of 5 runs failed (a small
+  sample). Ordinary use, our own kernel builds and `stress-ng` don't trigger it. If you hit unexplained crashes under
+  such load, cap the big cores until the next boot:
+  `echo 2200000 | sudo tee /sys/devices/system/cpu/cpu{0,1,10,11}/cpufreq/scaling_max_freq`.
+  Details: [bench/CRASH-ANALYSIS.md](bench/CRASH-ANALYSIS.md).
 - **LLMs on the GPU:** llama.cpp on panvk is slow (~1.7 tok/s) and prompt processing fails with
   `ErrorOutOfDeviceMemory`. Use the CPU (`-dev none` in a Vulkan build).
 - **panvk** is not yet a conformant Vulkan driver, and the GPU temperature sensors don't read.
