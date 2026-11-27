@@ -802,6 +802,9 @@ not compared):
 - The workaround (README, INSTALL, release v2026.11.25 notes, `bench/CRASH-ANALYSIS.md`) now caps only
   `cpu{0,1,10,11}` at 2.2 GHz instead of every policy. It is a sysfs setting, the same on both kernel tracks.
   `bench/crash-repro.sh` gained `MAXF_CPUS` to cap only chosen CPUs.
+- The big pairs capped at 2.4 GHz (the rest at full speed) also passed 5 of 5, so their edge is between 2.4 and
+  2.5 GHz. The documented cap stays at 2.2 GHz until more runs back 2.4 GHz.
+- The 16:41 UTC loss of network on the board was the network switch (rebooted), not the board.
 
 ## Open items
 

@@ -304,6 +304,13 @@ on this board (the same on 6.18.64 and 7.3.5):
 - Together with the earlier tests this points at voltage margin on the big-core rail at 2.5-2.6 GHz under all-core
   load, a power-firmware setting.
 
+**Big pairs at 2.4 GHz** (same setup; cpu0, 1, 10 and 11 capped at 2,400,000 kHz, read back exactly; the logged
+clock of cpu0 sat at 2.4 GHz under load; mid pairs and littles at full speed; `panic_on_oops=1`): **0 of 5 failed**,
+all runs clean in 5.5-5.6 min. With the earlier all-core 2.5 GHz set (2 of 2 failed, both big pairs at 2.5 GHz),
+the edge for the big pairs lies between 2.4 and 2.5 GHz. A 2.4 GHz cap on those four cores (8% off cpu0-1, 4% off
+cpu10-11) would be a lighter workaround than 2.2 GHz, but it rests on 5 runs only; the documented workaround stays
+at 2.2 GHz until more runs back the 2.4 GHz one.
+
 ## Earlier events that may be the same thing
 
 - The silent hangs and the kernel panic during full kernel builds (2026-11-21), put down to NVMe heat. The fan fixed
