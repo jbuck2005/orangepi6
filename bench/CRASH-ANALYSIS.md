@@ -319,16 +319,19 @@ at 2.2 GHz until more runs back the 2.4 GHz one.
 
 ## Next steps
 
-1. More runs at the big-pairs-only 2.2 GHz cap, to know how safe it is; try 2.3 and 2.4 GHz on the big pairs to
-   find the edge. The test kernels built on 2026-11-25 (CIX 7.3, SIS_UTIL fix, misfit traces) were all built at the
+1. Done in part: the big pairs pass at 2.2 and 2.4 GHz (5 of 5 each) and fail at 2.5 GHz, so the edge is between
+   2.4 and 2.5 GHz. Still to do: find which big pair is the weak one (each at full speed with the other capped), a
+   step at 2.45 GHz if the driver honours it, and a longer confidence run at 2.4 GHz before it could replace 2.2 GHz
+   as the advice. The test kernels built on 2026-11-25 (CIX 7.3, SIS_UTIL fix, misfit traces) were all built at the
    all-core 2.2 GHz cap without a crash.
 2. Power: an A-B-A swap to a 65 W supply (above) showed it doesn't follow the supply. Measuring the board's own
    rails under load would still help; measure input current or voltage under the failing load if a USB-C meter
    is available. Try another supply.
 3. Firmware: the 2026-10-19 firmware exposes no CPU or DDR voltage or power settings (see "Firmware and kernel
    options" above for the ranked tests instead).
-4. Report to Orange Pi / CIX with the reproducer if it holds, since a stock Armbian user would hit it on any big
-   parallel build.
+4. Reported to CIX as [cixtech/bios#7](https://github.com/cixtech/bios/issues/7) (2026-11-26), with a follow-up
+   on 2026-11-27 giving the stock-kernel, per-cluster and errata results and asking for a test firmware with a
+   larger guard band or a lower top OPP for the big cores. A post on the Orange Pi forum is still to come.
 5. Decide whether the release should ship the big-pairs frequency cap (a boot setting) until the cause is known.
 
 ## Logs

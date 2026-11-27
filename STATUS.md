@@ -75,9 +75,22 @@
 - [x] Proving run on the release build (with `0056`): 10/10 warm reboots, 3/3 cold boots, 8 h of full builds and
       `stress-ng --verify` (16/16 stress rounds, 15/16 builds; one 49 s build failure, cause unknown, log lost).
 - [x] Released as **v2026.11.24** and made the default; 6.18.64 LTS stays available with `KERNEL_TRACK=6.18`.
-- [ ] A 10 h run with per-cycle logs (running), and the cause of the one build failure if it repeats.
+- [x] A 10 h run with per-cycle logs (2026-11-24): 20/20 builds, 19/19 stress rounds, no errors; the 49 s build
+      failure did not recur.
 - [ ] CIX display drivers (`DRM_CIX`) port to the 7.x DRM APIs (off for now; headless board).
 - [ ] Drop the debug patches `0050`, `0051` once the reboot and AER work is closed.
+
+## Full-load crash (open, since 2026-11-24)
+Details: [bench/CRASH-ANALYSIS.md](bench/CRASH-ANALYSIS.md).
+- [x] Reproducer (`bench/crash-repro.sh`): a module rebuild of a large kernel tree on all 12 cores corrupts memory
+      within minutes. It fails the same way on both our kernels and on Armbian's stock kernel.
+- [x] Ruled out: power supply, memory rate (5500 MT/s fails too), heat, the HDA driver, deep idle states and the
+      missing A720/A520 errata workarounds. `stress-ng --verify` and memtester pass.
+- [x] Narrowed to the big A720 pairs (cpu0-1 at 2.6 GHz, cpu10-11 at 2.5 GHz): capped at 2.2 or 2.4 GHz, 0 of 5
+      runs failed; at full speed, 4 of 5. Points at voltage margin on the big-core rail.
+- [x] Workaround documented (README, INSTALL, release notes): cap `cpu{0,1,10,11}` at 2.2 GHz under such load.
+- [x] Reported to CIX ([cixtech/bios#7](https://github.com/cixtech/bios/issues/7)).
+- [ ] Which big pair is weak; a confidence run at 2.4 GHz; a firmware fix from CIX.
 
 ## Phase 2: NPU (working, 2026-11-22)
 Details: [docs/npu.md](docs/npu.md).
