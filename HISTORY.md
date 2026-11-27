@@ -32,6 +32,9 @@ Kernel lines:
 | Build-load crashes at 6000 MT/s track NVMe controller heat; an 8 h full-build run passes with a fan on the SSD | [2026-11-21](#2026-11-21-stability-at-6000-mts-nvme-heat) |
 | NPU works on an open stack (CIX driver 6.2.0, libaipudrv 4.1.0); no firmware needed | [2026-11-22](#2026-11-22-npu-phase-started-driver-updated-to-cix-620) |
 | Fuzzy patching misplaced an arm_scmi hunk into a NULL dereference | [2026-11-19](#2026-11-19-kernel-61864-lts) |
+| Full-load crash: not memory rate, PSU, heat, HDA or deep idle | [2026-11-26](#2026-11-26-crash-tests-no-ddr-ecc-reports-not-the-hda-driver-not-deep-idle-not-the-memory-rate) |
+| Full-load crash: Armbian's stock kernel fails too; missing CPU errata aren't the cause | [2026-11-27](#2026-11-27-rma-evidence-stock-kernel-fails-too-missing-cpu-errata-arent-the-cause) |
+| Full-load crash needs the big A720 pairs above 2.4 GHz; workaround caps only those | [2026-11-27](#2026-11-27-crash-workaround-narrowed-to-the-big-a720-cores) |
 
 ---
 
@@ -806,16 +809,24 @@ not compared):
   2.5 GHz. The documented cap stays at 2.2 GHz until more runs back 2.4 GHz.
 - The 16:41 UTC loss of network on the board was the network switch (rebooted), not the board.
 
+## 2026-11-27: crash docs brought up to date
+
+- `bench/CRASH-ANALYSIS.md` next steps: the 2.2/2.4/2.5 GHz edge, what is left to test, and the report to CIX
+  (cixtech/bios#7 and its 2026-11-27 follow-up).
+- `STATUS.md`: the kernel-7 10 h run marked passed (2026-11-24); a section on the full-load crash.
+- README and INSTALL note that 2.4 GHz also passed; the advice stays at 2.2 GHz. Crash findings added to the
+  index above; open items updated.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.
 - Kernel 7: the cause of the one 49 s build failure (not seen again in 20 builds); the
   quick-reboot fallback (`sky1_pending` still set after a confirmed boot); CIX display drivers; drop the debug
   patches `0050`/`0051`.
-- Silent hangs under build load: likely NVMe controller heat (see 2026-11-21); confirm with a no-fan A/B run.
 - Corruption crashes under full-chip load (`bench/CRASH-ANALYSIS.md`): not the external supply (A-B-A test); it
-  needs the big A720 pairs at 2.5/2.6 GHz; more runs at the big-pairs cap, find its edge (2.3/2.4 GHz), follow up
-  with CIX on the big-core voltage margin, and decide whether to ship the cap as a boot setting.
+  needs the big A720 pairs at 2.5/2.6 GHz (edge between 2.4 and 2.5 GHz); find which pair is weak, a confidence run
+  at 2.4 GHz, follow up with CIX on cixtech/bios#7, and decide whether to ship the cap as a boot setting. The
+  earlier silent hangs under build load (2026-11-21, put down to NVMe heat) may be the same fault.
 - Next 7.3.y kernel update: add the fixed-regulator ACPI fix (7.3.6 regression above) before moving past 7.3.5.
 - Drop 0055 once a mainline SIS_UTIL fix lands; follow the upstream PRs and issues listed on 2026-11-25.
 - RTC battery (CR2032 on JRTC1) to keep firmware settings across power loss.

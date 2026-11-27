@@ -128,7 +128,7 @@ pre-release v2026.11.22, have the older driver, which the library does not work 
   by `pahole`) on all 12 cores at full speed makes build tools crash, and sometimes the kernel, within minutes (2 to 5
   of 5 runs failed, on both kernels and on Armbian's stock kernel). It needs the four big A720 cores (cpu0-1 at
   2.6 GHz, cpu10-11 at 2.5 GHz) at full speed: with only those capped at 2.2 GHz, 0 of 5 runs failed (a small
-  sample). Ordinary use, our own kernel builds and `stress-ng` don't trigger it. If you hit unexplained crashes under
+  sample; 2.4 GHz also passed 5 of 5, so the edge is between 2.4 and 2.5 GHz, but 2.2 GHz is the tested advice). Ordinary use, our own kernel builds and `stress-ng` don't trigger it. If you hit unexplained crashes under
   such load, cap the big cores until the next boot:
   `echo 2200000 | sudo tee /sys/devices/system/cpu/cpu{0,1,10,11}/cpufreq/scaling_max_freq`.
   Details: [bench/CRASH-ANALYSIS.md](bench/CRASH-ANALYSIS.md).
