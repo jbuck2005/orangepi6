@@ -176,13 +176,13 @@ Details: [bench/MEMORY-AB-REPORT.md](bench/MEMORY-AB-REPORT.md), [docs/npu.md](d
   by `pahole`) on all 12 cores at full speed makes build tools crash, and sometimes the kernel, within minutes (2 to 5
   of 5 runs failed, on both kernels and on Armbian's stock kernel). On our board it comes from one big A720 pair, cpu10-11
   (rated 2.5 GHz), which lacks margin under this load: capped at 2.4 GHz with every other core at full speed
-  (cpu0-1 at 2.6 GHz), 0 of 20 runs failed, and 45 of 45 runs at that cap have been clean, while at 2.45 GHz and
-  above it failed 10 of 15. Ordinary use, our own kernel builds and `stress-ng` don't trigger it. If you hit
+  (cpu0-1 at 2.6 GHz), 64 of 65 runs at that cap were clean on the two kernels (the one failure was a build-tool
+  crash on 6.18, with no kernel crash), while at 2.45 GHz and above it failed 10 of 15. Ordinary use, our own kernel builds and `stress-ng` don't trigger it. If you hit
   unexplained crashes under such load, cap that pair until the next boot (same command on both kernel tracks; it
   names CPUs, not cpufreq policies):
   `echo 2400000 | sudo tee /sys/devices/system/cpu/cpu{10,11}/cpufreq/scaling_max_freq`.
-  Check it with `cat /sys/devices/system/cpu/cpu10/cpufreq/scaling_max_freq`. Other boards may differ; capping all
-  four big cores (`cpu{0,1,10,11}`) at 2.2 GHz is the more cautious fallback.
+  Check it with `cat /sys/devices/system/cpu/cpu10/cpufreq/scaling_max_freq`. Other boards may differ. For no failures at
+  all under this load, cap all four big cores (`cpu{0,1,10,11}`) at 2.2 GHz instead.
   Details: [bench/CRASH-ANALYSIS.md](bench/CRASH-ANALYSIS.md).
 - **LLMs on the GPU:** llama.cpp on panvk is slow (~1.7 tok/s) and prompt processing fails with
   `ErrorOutOfDeviceMemory`. Use the CPU (`-dev none` in a Vulkan build).

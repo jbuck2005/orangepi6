@@ -859,6 +859,14 @@ not compared):
   temperatures and caps with each event. Shared sensor code: `bench/lib-sensors.sh`.
 - Tested off the board against a copy of the sysfs layout; the first board use waits for the running 6.18 set.
 
+## 2026-11-28: the cpu10-11 cap on the 6.18 track
+
+- 20 runs of the reproducer on the release 6.18.64 kernel with only cpu10-11 capped at 2.4 GHz: 1 failed (run 11, a
+  build-tool segfault 2.9 min in, no kernel crash), 19 clean. CPU at most 57 C, SSD at most 68 C.
+- With the 7.3.5 sets that is 64 clean runs of 65 at that cap, against 10 failures in 15 at 2.45 GHz and above. The
+  2.4 GHz cap stays the light workaround; README, INSTALL and `STATUS.md` now give the counts and name the 2.2 GHz cap
+  on all four big cores as the option with no failure seen. Details in `bench/CRASH-ANALYSIS.md`.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.
@@ -867,7 +875,7 @@ not compared):
   patches `0050`/`0051`.
 - Corruption crashes under full-chip load (`bench/CRASH-ANALYSIS.md`): not the external supply (A-B-A test); it
   comes from the cpu10-11 pair above 2.4 GHz (workaround: cap that pair at 2.4 GHz); a confidence run with the cap on
-  the 6.18 track, follow up with CIX on cixtech/bios#7, and decide whether to ship the cap as a boot setting. The
+  the 6.18 track had 1 tool crash in 20 (2026-11-28), so 2.4 GHz is not fully clean; follow up with CIX on cixtech/bios#7, and decide whether to ship the cap as a boot setting. The
   earlier silent hangs under build load (2026-11-21, put down to NVMe heat) may be the same fault.
 - Next 7.3.y kernel update: add the fixed-regulator ACPI fix (7.3.6 regression above) before moving past 7.3.5.
 - Drop 0055 once a mainline SIS_UTIL fix lands; follow the upstream PRs and issues listed on 2026-11-25.

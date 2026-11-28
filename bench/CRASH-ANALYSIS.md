@@ -349,6 +349,15 @@ cpufreq policy, so this caps exactly that pair; it names CPUs rather than polici
 7 kernel tracks. In the reproducer: `MAXF=2400000 MAXF_CPUS=10,11`. The runs were on the 7.3.5 kernel; the same fault
 shows on 6.18 (our 6.18.64 and Armbian's stock 6.18.45 both fail uncapped).
 
+**cpu10-11 alone at 2.4 GHz on 6.18.64** (2026-11-28 13:07-15:09 UTC; release 6.18.64 kernel, otherwise the same
+setup as the 7.3.5 set above, NVMe temperatures logged in every run): **1 of 20 failed**. Run 11 (14:13 UTC) had a
+build-tool segfault (`Error 139`, while post-processing a media module) 2.9 min in; no kernel panic, Oops or lockup,
+and the next nine runs were clean. CPU at most 57 C, SSD at most 68 C. So 2.4 GHz is not a clean edge on this unit:
+with the 7.3.5 sets, cpu10-11 at 2.4 GHz has 64 clean runs of 65, against 10 failures in 15 at 2.45 GHz and above.
+The cap stays the documented light workaround (it takes the failure rate from most runs to about one in 65, and no
+kernel crash at it so far); capping all four big cores at 2.2 GHz is the option with no failure seen and is named as
+such in README and INSTALL. The fault and the cap behave the same on both kernel tracks.
+
 ## Earlier events that may be the same thing
 
 - The silent hangs and the kernel panic during full kernel builds (2026-11-21), put down to NVMe heat. The fan fixed
@@ -358,8 +367,9 @@ shows on 6.18 (our 6.18.64 and Armbian's stock 6.18.45 both fail uncapped).
 ## Next steps
 
 1. Done: the weak pair is cpu10-11 (edge 2.40-2.45 GHz), and a 20-run confidence set with only that pair at
-   2.4 GHz passed, so that cap replaced the 2.2 GHz one as the advice on 2026-11-28. Still open: a confidence run
-   with the cap on the 6.18 track, and whether to ship the cap as a boot setting. The test kernels built on 2026-11-25 (CIX 7.3, SIS_UTIL fix, misfit traces) were all built at the
+   2.4 GHz passed, so that cap replaced the 2.2 GHz one as the advice on 2026-11-28. The 6.18 confidence run
+   (2026-11-28) had 1 tool crash in 20, so 2.4 GHz lowers the rate a lot but is not clean. Still open: whether to
+   ship a cap as a boot setting, and at which clock. The test kernels built on 2026-11-25 (CIX 7.3, SIS_UTIL fix, misfit traces) were all built at the
    all-core 2.2 GHz cap without a crash.
 2. Power: an A-B-A swap to a 65 W supply (above) showed it doesn't follow the supply. Measuring the board's own
    rails under load would still help; measure input current or voltage under the failing load if a USB-C meter

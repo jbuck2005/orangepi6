@@ -91,8 +91,8 @@ Details: [bench/CRASH-ANALYSIS.md](bench/CRASH-ANALYSIS.md). Every test run foll
       runs failed; at full speed, 4 of 5. Points at voltage margin on the big-core rail.
 - [x] Weak pair found: cpu10-11 (policy10, rated 2.5 GHz); cpu0-1 is clean at 2.6 GHz. Edge 2.40-2.45 GHz.
 - [x] Workaround documented (README, INSTALL, release notes, 2026-11-28): cap only `cpu{10,11}` at 2.4 GHz under
-      such load (0 of 20 with everything else at full speed; 45 clean runs at that cap). Replaces the 2.2 GHz cap
-      on all four big cores.
+      such load (0 of 20 on 7.3.5 and 1 of 20 on 6.18.64 with everything else at full speed; 64 of 65 runs at that
+      cap clean, the failure a build-tool crash). The 2.2 GHz cap on all four big cores is the zero-failure option.
 - [x] Reported to CIX ([cixtech/bios#7](https://github.com/cixtech/bios/issues/7)).
 - [ ] A firmware fix from CIX; decide whether to ship the cap as a boot setting.
 
