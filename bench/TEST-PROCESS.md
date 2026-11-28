@@ -47,9 +47,12 @@ this boot's folder. The sequence number orders boots; the date can be wrong unti
 RTC battery. Files are fsync'd every minute, so a hard reset loses at most the last minute (a hard reset right after
 heavy writes has zeroed unsynced files before).
 
-The SSD temperature comes from the kernel's NVMe hwmon sensor, which needs no tools and no root. If a kernel ever
-lacks it, pre-flight fails rather than running a set without SSD data. `smartctl -A /dev/nvme0` or
-`nvme smart-log /dev/nvme0` give the same reading by hand.
+The SSD temperature comes from the kernel's NVMe hwmon sensor (`CONFIG_NVME_HWMON`, enabled in our builds after
+v2026.11.25), which needs no tools and no root. The v2026.11.25 kernels and older lack it; there the loggers read the
+SMART log with nvme-cli (`sudo apt install nvme-cli`; the services run as root, pre-flight uses `sudo -n`). With
+neither, pre-flight fails rather than running a set without SSD data. The value is the hottest of the Composite
+temperature and the sensors, leaving out a sensor that reads exactly the warning threshold (WCTEMP): the Kingston NV3
+reports "Temperature Sensor 2" as a fixed 75 C. `nvme smart-log /dev/nvme0` gives the readings by hand.
 
 Power: the board has no voltage, current or power sensors (hwmon has temperatures only). Wall power comes from a
 smart plug, read on the PC with `tools/plug-power.py --start <set start> --end <set end>`; add its min/mean/max to the
@@ -103,7 +106,7 @@ EXPECT_CAPS="p0=2600 p2=1800 p6=2300 p8=2200 p10=2400" EXPECT_MEM=6000 bench/pre
 | Kernel | `uname -r` | it does not contain `EXPECT_KERNEL` |
 | Caps | every policy's `scaling_max_freq` **read back** | it differs from `EXPECT_CAPS` (a driver can round a value; caps reset at every boot) |
 | Fan | the operator sets `FAN=on` or `FAN=off` (software cannot see the SSD fan) | not given |
-| SSD sensor | hwmon `nvme` | missing |
+| SSD sensor | hwmon `nvme`, else nvme-cli's SMART log | neither gives a reading |
 | Memory rate | SMBIOS (`dmidecode`, with `EXPECT_MEM`) | different |
 | Loggers | both services active and enabled, a sample under 60 s old, a `bench-t:` line under 3 min old | any of them not |
 | Disk space | log and work file systems | under 5 GB |

@@ -3,7 +3,7 @@
 #                                  controller shows up as hwmon "nvme"), each cpufreq policy's current and
 #                                  maximum clock, load average, EDAC counts
 #   cpu_temp    hottest thermal zone (CPU/SoC), whole degrees C
-#   nvme_temp   hottest NVMe hwmon sensor, whole degrees C ("na" if the kernel has no NVMe hwmon)
+#   nvme_temp   hottest NVMe sensor, whole degrees C: hwmon "nvme", else nvme-cli's SMART log ("na" if neither)
 #   caps_line   every policy's scaling_max_freq read back, in MHz: "p0=2600 p2=1800 p6=2300 p8=2200 p10=2400"
 #   kmsg_line   the one-line summary written to the kernel log (and so to the serial console)
 : "${SYSFS:=/sys}"   # SYSFS=<dir> reads a copy of /sys instead (for testing the tools off the board)
@@ -19,7 +19,26 @@ done
 shopt -u nullglob   # only for the lists above; the scripts that source this keep normal globbing
 _c() { local v; v=$(cat "$1" 2>/dev/null) && [ -n "$v" ] && echo $(( v / 1000 )) || echo na; }
 cpu_temp() { local m=na v; for z in "${_zones[@]}"; do v=$(_c "$z/temp"); [ "$v" != na ] && { [ "$m" = na ] || [ "$v" -gt "$m" ]; } && m=$v; done; echo "$m"; }
-nvme_temp() { local m=na v; for f in "${_nvme[@]}"; do v=$(_c "$f"); [ "$v" != na ] && { [ "$m" = na ] || [ "$v" -gt "$m" ]; } && m=$v; done; echo "$m"; }
+# Hottest NVMe sensor. A sensor that reads exactly the controller's warning threshold (WCTEMP) is left out: the
+# Kingston NV3 reports its "Temperature Sensor 2" as a fixed 75 C, which is its WCTEMP, not a reading.
+# Kernels without CONFIG_NVME_HWMON (our 6.18.64 and 7.3.5 releases up to v2026.11.25) have no hwmon "nvme"; then
+# the SMART log is read with nvme-cli (as root, or with sudo -n), and "na" only if that fails too.
+nvme_temp() {
+  local m=na v w=na f
+  if [ ${#_nvme[@]} -gt 0 ]; then
+    f=${_nvme[0]%/*}/temp1_max; [ -r "$f" ] && w=$(_c "$f")
+    for f in "${_nvme[@]}"; do v=$(_c "$f"); [ "$v" = na ] && continue; case $f in */temp1_input) ;; *) [ "$v" = "$w" ] && continue ;; esac
+      { [ "$m" = na ] || [ "$v" -gt "$m" ]; } && m=$v; done
+  elif [ "$SYSFS" = /sys ] && command -v nvme >/dev/null 2>&1 && [ -e "${NVME_DEV:=/dev/nvme0}" ]; then
+    local s=sudo; [ "$(id -u)" = 0 ] && s=""
+    w=$($s ${s:+-n} nvme id-ctrl "$NVME_DEV" 2>/dev/null | awk '/^wctemp/{print $3-273}')
+    m=$($s ${s:+-n} nvme smart-log "$NVME_DEV" 2>/dev/null | awk -v w="${w:-x}" -F': *' '
+      /^temperature/ {c=$2+0} /^Temperature Sensor/ {v=$2+0; if (v!=w && v>0 && (m=="" || v>m)) m=v}
+      END {if (c!="" && (m=="" || c>m)) m=c; print (m=="" ? "na" : m)}')
+    [ -n "$m" ] || m=na
+  fi
+  echo "$m"
+}
 caps_line() { local p o=""; for p in "${_pols_sorted[@]}"; do o+="${o:+ }p${p##*policy}=$(( $(cat "$p/scaling_max_freq") / 1000 ))"; done; echo "$o"; }
 freqs_line() { local p o=""; for p in "${_pols_sorted[@]}"; do o+="${o:+/}$(( $(cat "$p/scaling_cur_freq" 2>/dev/null || echo 0) / 1000 ))"; done; echo "$o"; }
 edac_counts() {

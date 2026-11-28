@@ -867,6 +867,13 @@ not compared):
   2.4 GHz cap stays the light workaround; README, INSTALL and `STATUS.md` now give the counts and name the 2.2 GHz cap
   on all four big cores as the option with no failure seen. Details in `bench/CRASH-ANALYSIS.md`.
 
+## 2026-11-28: SSD temperature in the bench loggers on the released kernels
+
+- First install of the bench loggers on the board: `nvme=na`. Our kernels were built without `CONFIG_NVME_HWMON`, so
+  there is no hwmon `nvme` (the earlier NVMe logging used nvme-cli). `bench/lib-sensors.sh` now falls back to
+  nvme-cli's SMART log, and leaves out a sensor stuck at the warning threshold (the Kingston NV3's Sensor 2 always
+  reads 75 C, its WCTEMP). `scripts/02-fetch-patch.sh` enables `NVME_HWMON` on both tracks from the next build.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.
