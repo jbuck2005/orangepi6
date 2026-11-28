@@ -28,7 +28,7 @@ cp "../linux-sky1/config/$SKY1_CONFIG" .config
 ./scripts/config --set-str LOCALVERSION "-sky1" --disable DEBUG_INFO_BTF --disable DEBUG_INFO \
   --enable DEBUG_INFO_NONE --disable DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT --disable DEBUG_INFO_DWARF5 \
   --enable PSTORE_RAM --enable PSTORE_CONSOLE --enable PSTORE_PMSG \
-  --enable NETCONSOLE --enable NETCONSOLE_DYNAMIC --enable NETPOLL --enable CONFIGFS_FS
+  --enable NETCONSOLE --enable NETCONSOLE_DYNAMIC --enable NETPOLL --enable CONFIGFS_FS --enable NVME_HWMON
 # NIC driver for the two RTL8125B ports: mainline r8169 (default) or Realtek's r8125 (NIC_DRIVER=r8125).
 # r8169 needs rtl_nic/rtl8125b-2.fw from linux-firmware in the root filesystem (Armbian has it). With
 # r8125, every warm reboot loses both NICs until a power cut (state r8125 leaves in the chip at probe
