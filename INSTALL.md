@@ -126,11 +126,15 @@ pre-release v2026.11.22, have the older driver, which the library does not work 
   through GPIO038/039, is experimental: it froze the board under Armbian.)
 - **Heavy full-chip load can corrupt memory.** Rebuilding every module of a large kernel tree (each post-processed
   by `pahole`) on all 12 cores at full speed makes build tools crash, and sometimes the kernel, within minutes (2 to 5
-  of 5 runs failed, on both kernels and on Armbian's stock kernel). It needs the four big A720 cores (cpu0-1 at
-  2.6 GHz, cpu10-11 at 2.5 GHz) at full speed: with only those capped at 2.2 GHz, 0 of 5 runs failed (a small
-  sample; 2.4 GHz also passed 5 of 5, so the edge is between 2.4 and 2.5 GHz, but 2.2 GHz is the tested advice). Ordinary use, our own kernel builds and `stress-ng` don't trigger it. If you hit unexplained crashes under
-  such load, cap the big cores until the next boot:
-  `echo 2200000 | sudo tee /sys/devices/system/cpu/cpu{0,1,10,11}/cpufreq/scaling_max_freq`.
+  of 5 runs failed, on both kernels and on Armbian's stock kernel). On our board it comes from one big A720 pair, cpu10-11
+  (rated 2.5 GHz), which lacks margin under this load: capped at 2.4 GHz with every other core at full speed
+  (cpu0-1 at 2.6 GHz), 0 of 20 runs failed, and 45 of 45 runs at that cap have been clean, while at 2.45 GHz and
+  above it failed 10 of 15. Ordinary use, our own kernel builds and `stress-ng` don't trigger it. If you hit
+  unexplained crashes under such load, cap that pair until the next boot (same command on both kernel tracks; it
+  names CPUs, not cpufreq policies):
+  `echo 2400000 | sudo tee /sys/devices/system/cpu/cpu{10,11}/cpufreq/scaling_max_freq`.
+  Check it with `cat /sys/devices/system/cpu/cpu10/cpufreq/scaling_max_freq`. Other boards may differ; capping all
+  four big cores (`cpu{0,1,10,11}`) at 2.2 GHz is the more cautious fallback.
   Details: [bench/CRASH-ANALYSIS.md](bench/CRASH-ANALYSIS.md).
 - **Cool the NVMe SSD.** On a bare board the M.2 slot gets no airflow. Under heavy disk load (a full kernel build)
   the controller of a heatsink-less SSD reached 97-100 C on our board, and we saw a hang and a kernel panic during

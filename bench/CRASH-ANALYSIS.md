@@ -1,8 +1,10 @@
 # Failure analysis: corruption crashes under full-chip load (2026-11-24)
 
-Status: **open**. Reproducible in about 1 to 3 minutes. Avoided by capping the four big A720 cores (cpu0-1 and
-cpu10-11) at 2.2 GHz; see [Per-cluster caps](#per-cluster-caps-2026-11-27). Until 2026-11-27 the workaround capped
-every core.
+Status: **open**. Reproducible in about 1 to 3 minutes. Avoided by capping one big A720 pair, cpu10-11
+(policy10, rated 2.5 GHz), at 2.4 GHz with every other core at full speed:
+`echo 2400000 | sudo tee /sys/devices/system/cpu/cpu{10,11}/cpufreq/scaling_max_freq` (until the next boot; same on
+both kernel tracks). See [Weak-core hunt](#weak-core-hunt-and-clock-steps-2026-11-27-evening). Earlier workarounds:
+every core at 2.2 GHz (until 2026-11-27), then the four big cores at 2.2 GHz (2026-11-27 to 2026-11-28).
 
 ## Symptom
 
@@ -295,7 +297,7 @@ on this board (the same on 6.18.64 and 7.3.5):
   It shows the failure doesn't need the mid pairs fast, and is a control for the first set rather than its mirror.
 - 5 runs each is a small sample: 0 of 5 against an uncapped baseline of 2-5 of 5 is a clear difference, but not proof
   that the narrow cap never fails. More runs at it will follow in later test sets.
-- **New workaround:** cap only the big pairs (12-15% off their top speed). The speed gain over the all-core cap is
+- **Workaround from 2026-11-27 to 2026-11-28** (since replaced by the cpu10-11-only cap below): cap only the big pairs (12-15% off their top speed). The speed gain over the all-core cap is
   small: that cap also slowed only cpu6-7 (2.3 to 2.2 GHz), since cpu8-9 and the littles already top out at or below
   2.2 GHz. Its value is that it names the cores at fault. The command:
   `echo 2200000 | sudo tee /sys/devices/system/cpu/cpu{0,1,10,11}/cpufreq/scaling_max_freq` (until the next boot).
@@ -340,7 +342,12 @@ Mid pairs (cpu6-9) and the A520s at full speed in every set. CPU at most 55 C; S
 mid pairs and A520s at full speed; same setup): **0 of 20 failed**, every run clean in 5.6 min. CPU at most 54 C, SSD
 controller at most 67 C (fan at 5 V, logger checked before every run). Counting the two 2.4 GHz sets with both fast
 pairs capped (25 runs) and this one, cpu10-11 at 2.4 GHz has passed 45 runs, while at 2.45 GHz and above it failed
-10 of 15. On this unit, capping cpu10-11 at 2.4 GHz is the lightest workaround that has held.
+10 of 15. On this unit, capping cpu10-11 at 2.4 GHz is the lightest workaround that has held, and since 2026-11-28 it
+is the documented one (README, INSTALL, STATUS, the v2026.11.25 release notes):
+`echo 2400000 | sudo tee /sys/devices/system/cpu/cpu{10,11}/cpufreq/scaling_max_freq`. cpu10 and cpu11 share one
+cpufreq policy, so this caps exactly that pair; it names CPUs rather than policies, so it is the same on the 6.18 and
+7 kernel tracks. In the reproducer: `MAXF=2400000 MAXF_CPUS=10,11`. The runs were on the 7.3.5 kernel; the same fault
+shows on 6.18 (our 6.18.64 and Armbian's stock 6.18.45 both fail uncapped).
 
 ## Earlier events that may be the same thing
 
@@ -350,10 +357,9 @@ pairs capped (25 runs) and this one, cpu10-11 at 2.4 GHz has passed 45 runs, whi
 
 ## Next steps
 
-1. Done in part: the big pairs pass at 2.2 and 2.4 GHz (5 of 5 each) and fail at 2.5 GHz, so the edge is between
-   2.4 and 2.5 GHz. Still to do: find which big pair is the weak one (each at full speed with the other capped), a
-   step at 2.45 GHz if the driver honours it, and a longer confidence run at 2.4 GHz before it could replace 2.2 GHz
-   as the advice. The test kernels built on 2026-11-25 (CIX 7.3, SIS_UTIL fix, misfit traces) were all built at the
+1. Done: the weak pair is cpu10-11 (edge 2.40-2.45 GHz), and a 20-run confidence set with only that pair at
+   2.4 GHz passed, so that cap replaced the 2.2 GHz one as the advice on 2026-11-28. Still open: a confidence run
+   with the cap on the 6.18 track, and whether to ship the cap as a boot setting. The test kernels built on 2026-11-25 (CIX 7.3, SIS_UTIL fix, misfit traces) were all built at the
    all-core 2.2 GHz cap without a crash.
 2. Power: an A-B-A swap to a 65 W supply (above) showed it doesn't follow the supply. Measuring the board's own
    rails under load would still help; measure input current or voltage under the failing load if a USB-C meter

@@ -35,6 +35,7 @@ Kernel lines:
 | Full-load crash: not memory rate, PSU, heat, HDA or deep idle | [2026-11-26](#2026-11-26-crash-tests-no-ddr-ecc-reports-not-the-hda-driver-not-deep-idle-not-the-memory-rate) |
 | Full-load crash: Armbian's stock kernel fails too; missing CPU errata aren't the cause | [2026-11-27](#2026-11-27-rma-evidence-stock-kernel-fails-too-missing-cpu-errata-arent-the-cause) |
 | Full-load crash needs the big A720 pairs above 2.4 GHz; workaround caps only those | [2026-11-27](#2026-11-27-crash-workaround-narrowed-to-the-big-a720-cores) |
+| Full-load crash comes from cpu10-11 alone; workaround now caps only that pair at 2.4 GHz | [2026-11-28](#2026-11-28-crash-workaround-cpu10-11-alone-at-24-ghz) |
 
 ---
 
@@ -826,6 +827,17 @@ not compared):
 - cpu10-11 alone at 2.4 GHz, everything else at full speed (cpu0-1 at 2.6 GHz): 0 of 20 failed. With the earlier
   2.4 GHz sets, 45 clean runs at that cap, against 10 failures in 15 runs at 2.45 GHz and above.
 
+## 2026-11-28: crash workaround: cpu10-11 alone at 2.4 GHz
+
+- The documented workaround for the full-load crash is now
+  `echo 2400000 | sudo tee /sys/devices/system/cpu/cpu{10,11}/cpufreq/scaling_max_freq` (until the next boot), with
+  every other core at full speed. It replaces the 2.2 GHz cap on all four big cores (`cpu{0,1,10,11}`), which stays
+  as the cautious fallback. Evidence: 0 of 20 with only cpu10-11 capped, 45 clean runs at 2.4 GHz for that pair,
+  10 of 15 failed at 2.45 GHz and above; cpu0-1 clean at 2.6 GHz.
+- The command names CPUs, not cpufreq policies, so it is the same on the 6.18 and 7 tracks.
+- Updated: README and INSTALL known issues, `STATUS.md`, `bench/CRASH-ANALYSIS.md`, the usage note in
+  `bench/crash-repro.sh` (`MAXF=2400000 MAXF_CPUS=10,11`), and the v2026.11.25 release notes.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.
@@ -833,8 +845,8 @@ not compared):
   quick-reboot fallback (`sky1_pending` still set after a confirmed boot); CIX display drivers; drop the debug
   patches `0050`/`0051`.
 - Corruption crashes under full-chip load (`bench/CRASH-ANALYSIS.md`): not the external supply (A-B-A test); it
-  needs the big A720 pairs at 2.5/2.6 GHz (edge between 2.4 and 2.5 GHz); find which pair is weak, a confidence run
-  at 2.4 GHz, follow up with CIX on cixtech/bios#7, and decide whether to ship the cap as a boot setting. The
+  comes from the cpu10-11 pair above 2.4 GHz (workaround: cap that pair at 2.4 GHz); a confidence run with the cap on
+  the 6.18 track, follow up with CIX on cixtech/bios#7, and decide whether to ship the cap as a boot setting. The
   earlier silent hangs under build load (2026-11-21, put down to NVMe heat) may be the same fault.
 - Next 7.3.y kernel update: add the fixed-regulator ACPI fix (7.3.6 regression above) before moving past 7.3.5.
 - Drop 0055 once a mainline SIS_UTIL fix lands; follow the upstream PRs and issues listed on 2026-11-25.

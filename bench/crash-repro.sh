@@ -3,11 +3,11 @@
 # Rebuilds every module of an already-built kernel tree (LD + pahole BTF + resolve_btfids), N times, while
 # logging events to the kernel log (they reach the serial console) and temperatures to the run's folder.
 #
-#   TREE=<built kernel tree with CONFIG_DEBUG_INFO_BTF_MODULES=y> CPUS=0-11 J=6 N=3 [MAXF=<kHz> [MAXF_CPUS=0,1,10,11]] bench/crash-repro.sh
+#   TREE=<built kernel tree with CONFIG_DEBUG_INFO_BTF_MODULES=y> CPUS=0-11 J=6 N=3 [MAXF=<kHz> [MAXF_CPUS=10,11]] bench/crash-repro.sh
 #
 # MAXF caps scaling_max_freq for the run (Linux setting only; a reboot resets it): on every cpufreq policy, or with
-# MAXF_CPUS (comma list of CPU numbers) only on the policies of those CPUs. MAXF=2200000 MAXF_CPUS=0,1,10,11 is the
-# big-A720-pairs workaround.
+# MAXF_CPUS (comma list of CPU numbers) only on the policies of those CPUs. MAXF=2400000 MAXF_CPUS=10,11 is the
+# documented workaround (the weak cpu10-11 pair only).
 # Results: $LOG_DIR (default ~/crash-repro/<time>-<tag>/): events.log, thermal.log, make<i>.log.
 # A failed run shows as rc!=0 with "Segmentation fault", "Aborted" or "malloc(): ..." in make<i>.log, or as a
 # kernel panic on the serial console (the board then reboots itself after panic=10).
