@@ -335,8 +335,12 @@ Mid pairs (cpu6-9) and the A520s at full speed in every set. CPU at most 55 C; S
 - A one-pair problem fits a part whose cpu10-11 pair has too little voltage margin at its rated 2.5 GHz on this unit,
   more than a board-wide supply issue: the other big pair shares the same regulator and is fine at 2.6 GHz.
 - Lightest workaround the data supports: cap cpu10-11 alone at 2.4 GHz (4% off that pair, nothing off the rest).
-  The documented workaround (2.2 GHz on cpu0, 1, 10 and 11) stays until a set with only cpu10-11 at 2.4 GHz and
-  everything else at full speed has been run.
+
+**cpu10-11 alone at 2.4 GHz** (2026-11-28 00:50-02:55 UTC; policy10 at 2,400,000 kHz, cpu0-1 at its full 2.6 GHz,
+mid pairs and A520s at full speed; same setup): **0 of 20 failed**, every run clean in 5.6 min. CPU at most 54 C, SSD
+controller at most 67 C (fan at 5 V, logger checked before every run). Counting the two 2.4 GHz sets with both fast
+pairs capped (25 runs) and this one, cpu10-11 at 2.4 GHz has passed 45 runs, while at 2.45 GHz and above it failed
+10 of 15. On this unit, capping cpu10-11 at 2.4 GHz is the lightest workaround that has held.
 
 ## Earlier events that may be the same thing
 
