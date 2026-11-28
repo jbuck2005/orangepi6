@@ -5,6 +5,7 @@ Status: **open**. Reproducible in about 1 to 3 minutes. Avoided by capping one b
 `echo 2400000 | sudo tee /sys/devices/system/cpu/cpu{10,11}/cpufreq/scaling_max_freq` (until the next boot; same on
 both kernel tracks). See [Weak-core hunt](#weak-core-hunt-and-clock-steps-2026-11-27-evening). Earlier workarounds:
 every core at 2.2 GHz (until 2026-11-27), then the four big cores at 2.2 GHz (2026-11-27 to 2026-11-28).
+A short evidence summary with crash screenshots, for a return claim: [RMA-EVIDENCE.md](RMA-EVIDENCE.md).
 
 ## Symptom
 
@@ -383,6 +384,7 @@ such in README and INSTALL. The fault and the cap behave the same on both kernel
 
 ## Logs
 
-Kept off the repo (they contain the board's addresses): the serial capture since 09:30, the extracted panics and every
+Sanitised excerpts of a stock-kernel panic, a hard lockup, the heap corruption and an A-B run set are in
+[rma-evidence/](rma-evidence/), summarised in [RMA-EVIDENCE.md](RMA-EVIDENCE.md). Kept off the repo (they contain the board's addresses): the serial capture since 09:30, the extracted panics and every
 board-side run log (events, temperatures, make output) are archived on the logging PC under
 `crash-analysis-20261124/`.

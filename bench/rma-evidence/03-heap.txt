@@ -1,0 +1,51 @@
+# Heap corruption in build tools, Orange Pi 6, kernel 7.3.5 (Sky1-Linux based), 2026-11-24.
+# Load: 'make modules' of a 7.3.6 tree on all 12 cores (-j6 plus pahole/resolve_btfids per module), all cores at full clock, memory 6000 MT/s.
+# The same tree and command pass every time with the CPUs capped at 2.2 GHz. glibc aborts (Error 134) and crashes (255) below.
+
+  LD [M]  drivers/soc/qcom/qmi_helpers.ko
+  LD [M]  drivers/soc/qcom/rmtfs_mem.ko
+  BTF [M] drivers/soc/qcom/qmi_helpers.ko
+  BTF [M] drivers/soc/qcom/rmtfs_mem.ko
+  LD [M]  drivers/soc/qcom/rpm-proc.ko
+  LD [M]  drivers/soc/qcom/smd-rpm.ko
+  BTF [M] drivers/soc/qcom/rpm-proc.ko
+  BTF [M] drivers/soc/qcom/smd-rpm.ko
+  LD [M]  drivers/soc/qcom/qcom_smem.ko
+  BTF [M] drivers/soc/qcom/qcom_smem.ko
+  LD [M]  drivers/soc/qcom/smp2p.ko
+  BTF [M] drivers/soc/qcom/smp2p.ko
+corrupted double-linked list
+Aborted
+libbpf: btf: type [2588]: invalid param name (string offset 1431655772)
+*** stack smashing detected ***: terminated
+Aborted
+FAILED: load base BTF from ./vmlinux: Invalid argument
+make[2]: *** [scripts/Makefile.modfinal:52: drivers/soc/qcom/qmi_helpers.ko] Error 134
+make[2]: *** Deleting file 'drivers/soc/qcom/qmi_helpers.ko'
+make[2]: *** Waiting for unfinished jobs....
+make[2]: *** [scripts/Makefile.modfinal:52: drivers/soc/qcom/smd-rpm.ko] Error 255
+make[2]: *** Deleting file 'drivers/soc/qcom/smd-rpm.ko'
+make[2]: *** [scripts/Makefile.modfinal:52: drivers/soc/qcom/rmtfs_mem.ko] Error 134
+make[2]: *** Deleting file 'drivers/soc/qcom/rmtfs_mem.ko'
+make[1]: *** [Makefile:2161: modules] Error 2
+make: *** [Makefile:248: __sub-make] Error 2
+
+# Another run (all cores at 2.5 GHz, 15:49):
+  LD [M]  drivers/xen/xen-front-pgdir-shbuf.ko
+  LD [M]  drivers/regulator/cros-ec-regulator.ko
+  BTF [M] drivers/xen/xen-front-pgdir-shbuf.ko
+  BTF [M] drivers/regulator/cros-ec-regulator.ko
+corrupted double-linked list
+Aborted
+make[2]: *** [scripts/Makefile.modfinal:52: drivers/xen/xen-gntalloc.ko] Error 134
+make[2]: *** Deleting file 'drivers/xen/xen-gntalloc.ko'
+make[2]: *** Waiting for unfinished jobs....
+make[1]: *** [Makefile:2161: modules] Error 2
+make: *** [Makefile:248: __sub-make] Error 2
+
+# Another signature seen in the same sets:
+  LD [M]  sound/soc/fsl/snd-soc-fsl-sai.ko
+  BTF [M] sound/soc/fsl/snd-soc-fsl-sai.ko
+malloc(): unaligned tcache chunk detected
+Aborted
+make[2]: *** [scripts/Makefile.modfinal:52: sound/soc/cix/snd-soc-cdns-i2s-sc.ko] Error 134
