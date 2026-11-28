@@ -30,7 +30,7 @@ temperatures), and status updates that drifted. None of those can happen if the 
 ```bash
 sudo bench/benchlog.sh install      # boot-persistent loggers: opi6-bench-sensors and opi6-bench-kmsg
 bench/benchlog.sh status            # both active and enabled, a fresh sample, a recent kernel-log line
-sudo apt install stress-ng          # for stability runs
+sudo apt install stress-ng dmidecode nvme-cli   # stability runs; memory rate and SSD temperature for pre-flight
 ```
 
 `benchlog.sh install` copies the loggers to `/usr/local/lib/opi6-bench/` and enables two services:
