@@ -81,7 +81,8 @@
 - [ ] Drop the debug patches `0050`, `0051` once the reboot and AER work is closed.
 
 ## Full-load crash (open, since 2026-11-24)
-Details: [bench/CRASH-ANALYSIS.md](bench/CRASH-ANALYSIS.md).
+Details: [bench/CRASH-ANALYSIS.md](bench/CRASH-ANALYSIS.md). Every test run follows
+[bench/TEST-PROCESS.md](bench/TEST-PROCESS.md).
 - [x] Reproducer (`bench/crash-repro.sh`): a module rebuild of a large kernel tree on all 12 cores corrupts memory
       within minutes. It fails the same way on both our kernels and on Armbian's stock kernel.
 - [x] Ruled out: power supply, memory rate (5500 MT/s fails too), heat, the HDA driver, deep idle states and the

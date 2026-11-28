@@ -1,5 +1,6 @@
 #!/bin/bash
 # Usage (as root; RUN_AS=<user> owns the builds, default $SUDO_USER): FULL=1 HOURS=8 nohup setsid bash bench/stability.sh &
+# Follow bench/TEST-PROCESS.md (boot loggers, pre-flight, serial capture, status reports).
 # Multi-hour memory/stability run for the board: repeated kernel builds at -j6 alternating with
 # stress-ng --vm --verify intervals, until HOURS have passed or something fails.
 # Every event goes to ~/stability.log and to the kernel log (/dev/kmsg, so it also lands on the serial console
@@ -30,7 +31,8 @@ keep() {  # $1 = iteration: save this iteration's build output and patch log und
 # Events go to the kernel log at level 3 so they reach the serial console even with a quiet console loglevel (4).
 say() { local m="stability: $(date +%T) $*"; echo "$m" >> $L; echo "<3>$m" > /dev/kmsg; }
 edac() { echo "ce=$(cat /sys/devices/system/edac/mc/mc*/ce_count 2>/dev/null | paste -sd+) ue=$(cat /sys/devices/system/edac/mc/mc*/ue_count 2>/dev/null | paste -sd+)"; }
-temps() { echo "max=$(( $(cat /sys/class/thermal/thermal_zone*/temp | sort -n | tail -1) / 1000 ))C"; }
+. "$REPO/bench/lib-sensors.sh"
+temps() { echo "cpu=$(cpu_temp)C nvme=$(nvme_temp)C caps=$(caps_line | tr ' ' ,)"; }
 : > $L
 say "start $(uname -r) hours=$HOURS stress=${STRESS_MIN}min full=${FULL:-0} logs=$LD"
 END=$(( SECONDS + HOURS * 3600 )); i=0; fails=0
