@@ -13,7 +13,7 @@ fi
   echo "== dmesg panthor/gpu/net/nvme"; dmesg | grep -iE 'panthor|mali|gpu|r8125|r8169|nvme' | head -80
   echo "== /dev/dri"; ls -la /dev/dri 2>&1
   echo "== lsmod"; lsmod | grep -E 'panthor|r812|drm'
-  echo "== errors"; dmesg --level=err,crit,alert,emerg | head -60
+  echo "== errors"; dmesg --level=err,crit,alert,emerg | grep -vE 'bench-(t|log|preflight):|repro:|stability:' | head -60
 } > "$OUT" 2>&1
 chmod 644 "$OUT"
 for i in $(seq 1 36); do

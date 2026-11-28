@@ -838,6 +838,27 @@ not compared):
 - Updated: README and INSTALL known issues, `STATUS.md`, `bench/CRASH-ANALYSIS.md`, the usage note in
   `bench/crash-repro.sh` (`MAXF=2400000 MAXF_CPUS=10,11`), and the v2026.11.25 release notes.
 
+## 2026-11-28: a mandatory test bench process
+
+- `bench/TEST-PROCESS.md`: the process every board test now follows, after logs were overwritten, an SSD temperature
+  logger stopped at a crash reboot and was not restarted, and status updates drifted. Rules, one-time setup,
+  pre-flight checklist, set and run records, crash and reboot handling, a status at most 15 minutes apart with a
+  template, and close-out.
+- `bench/benchlog.sh`: two systemd services enabled at boot, so every boot is logged even after a crash: every 10 s
+  all thermal zones, all hwmon temperatures (NVMe included), each policy's current and maximum clock, load and EDAC
+  counts; every minute a `bench-t:` temperature line in the kernel log, so temperatures reach the serial console;
+  the kernel log of every boot; pstore records of the previous crash. One folder per boot, never reused.
+- `bench/preflight.sh`: kernel, caps read back per policy, SSD sensor, memory rate, fan (operator), loggers alive,
+  disk space and clock; any failure stops the set.
+- `bench/crash-repro.sh`: runs pre-flight, writes `results.csv` (pass/fail/panic, signature, peak CPU and SSD
+  temperature per run) and `set.conf`, logs NVMe temperatures, never overwrites a run's log, and resumes a set after
+  a crash (the unfinished run is recorded as a panic with its pstore signature).
+- `bench/status.sh`: the status report body with live counts, peaks and logger health.
+- `bench/pull-logs.ps1`: copies the board's log folders to the PC every minute, never shortening a PC copy.
+  `bench/serial-log.ps1` marks the capture when the board goes quiet for 3 minutes. `bench/stability.sh` logs NVMe
+  temperatures and caps with each event. Shared sensor code: `bench/lib-sensors.sh`.
+- Tested off the board against a copy of the sysfs layout; the first board use waits for the running 6.18 set.
+
 ## Open items
 
 - NPU: check classification against ImageNet ground truth; more hub models.

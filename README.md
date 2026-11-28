@@ -206,7 +206,9 @@ The **2x2 "DEBUG" header** just below the left network jack is UART2: 3.3 V, **1
 jack is RX (left) and TX (right); the far row is GND. Cross TX/RX to a 3.3 V USB-serial adapter and leave its VCC
 unconnected. The firmware, GRUB and the sky1 kernel all log there. The firmware has no SPCR table, so serial test
 boots (`SERIAL=1 scripts/install.sh arm acpi`) use `earlycon=pl011,mmio32,0x040d0000`.
-`bench/serial-log.ps1` is a timestamping logger for Windows.
+`bench/serial-log.ps1` is a timestamping logger for Windows. Every board test follows
+[bench/TEST-PROCESS.md](bench/TEST-PROCESS.md): boot-persistent loggers, temperatures on the serial console,
+pre-flight checks, per-run records and status reports.
 
 <p>
   <img src="docs/images/debug-header-location.svg" width="600" alt="Orange Pi 6 top side to scale with all connectors: the 2x2 DEBUG header is just below the left network jack, beside the top of the 40-pin header">
@@ -244,7 +246,7 @@ change (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 | `docs/` | kernel 7 notes and board results (`KERNEL-7.md`), the CPU scheduling fix, r8125 vs r8169, the NPU (`npu.md`) |
 | `initramfs/`, `scripts/bootlog-area.sh` | early-boot logger: writes the kernel log to a raw disk area before root is mounted |
 | `dts/sky1-orangepi-6.dts` | non-Plus device tree (for the optional DT/`acpi=off` route) |
-| `bench/` | benchmark and memory-soak suite, Windows UART logger, A/B report |
+| `bench/` | test process ([TEST-PROCESS.md](bench/TEST-PROCESS.md)), boot-persistent loggers, pre-flight and status tools, benchmark and memory-soak suite, crash reproducer, Windows UART logger and log puller, A/B report |
 | `tools/` | netconsole listener and self-test; read-only smart-plug power report (`plug-power.py`); `npu-run` and `npu-prep.py` |
 | `scripts/npu-umd.sh` | builds and installs Arm China's open NPU library (`libaipudrv` 4.1.0); `setup.sh npu` runs it |
 | `scripts/01-toolchain.sh` | unprivileged toolchain from Ubuntu debs (only needed without root; `setup.sh` uses apt instead) |
