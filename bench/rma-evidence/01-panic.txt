@@ -1,0 +1,27 @@
+# Kernel panic on Armbian's stock kernel 6.18.45-current-arm64 (no third-party patches), Orange Pi 6, 2026-11-26.
+# Serial console capture (UTC-5 timestamps). Load: parallel kernel module build (pahole/BTF) on all 12 cores, memory 6000 MT/s.
+
+17:06:07.930 [   77.881329] repro: 17:06:08 stock-armbian start 6.18.45-current-arm64 cpus=0-11 j=6 n=1 maxf=2600000
+17:10:59.149 [  368.839626] Internal error: Oops - FPAC: 0000000072000000 [#1]  SMP
+17:10:59.149 [  368.846167] Modules linked in: [...]
+17:10:59.149 [  368.907370] CPU: 0 UID: 1000 PID: 72880 Comm: pahole Tainted: G S                  6.18.45-current-arm64 #1 VOLUNTARY 
+17:10:59.149 [  368.918326] Tainted: [S]=CPU_OUT_OF_SPEC
+17:10:59.149 [  368.922504] Hardware name: Cix Technology Group Co., Ltd. CIX Board/CIX Board, BIOS v1.0_for_opi6_linux 10/19/2026
+17:10:59.149 [  368.933111] pstate: 23400009 (nzCv daif +PAN -UAO +TCO +DIT -SSBS BTYPE=--)
+17:10:59.149 [  368.940332] pc : folio_add_new_anon_rmap+0xdc/0x268
+17:10:59.149 [  368.945476] lr : 0x0
+17:10:59.149 [  368.947922] sp : ffff80009481bbe0
+  [... registers ...]
+17:10:59.149 [  369.025127] Call trace:
+17:10:59.149 [  369.027824]  folio_add_new_anon_rmap+0xdc/0x268 (P)
+17:10:59.149 [  369.032954] Code: d503201f d503201f f9400bf3 a8c27bfd (d50323bf) 
+17:10:59.149 [  369.039297] ---[ end trace 0000000000000000 ]---
+  [... a second FPAC Oops on CPU 1 and a NULL dereference follow ...]
+17:11:00.664 [  370.498509] Kernel panic - not syncing: Oops: Fatal exception in interrupt
+17:11:00.664 [  370.505371] SMP: stopping secondary CPUs
+17:11:01.684 [  371.609397] SMP: failed to stop secondary CPUs 1,10
+17:11:01.684 [  371.614873] Kernel Offset: 0x4c38afca0000 from 0xffff800080000000
+17:11:01.684 [  371.621155] PHYS_OFFSET: 0x80000000
+17:11:01.684 [  371.624831] CPU features: 0x600000,0001e03c,5a6c62c1,357ff667
+17:11:01.684 [  371.630765] Memory Limit: none
+17:11:01.691 [  371.662905] ---[ end Kernel panic - not syncing: Oops: Fatal exception in interrupt ]---

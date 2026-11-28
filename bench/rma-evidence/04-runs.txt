@@ -1,0 +1,19 @@
+# Same reproducer, same board, kernel 7.3.5, memory 6000 MT/s, 2026-11-26 (times UTC-5). Only the clock caps differ.
+# 'pre:' is each cpufreq policy's scaling_max_freq read back before the run (kHz). policy0 = cpu0-1, policy10 = cpu10-11 (both A720).
+# 'board rebooted (crash)' = kernel panic and automatic reboot (panic=10); 'tool_crashes' = build tools that died.
+
+## A: cpu10-11 capped at 2.2 GHz, cpu0-1 at full 2.6 GHz -> 5 of 5 pass
+14:49:55 pre: policy0=2600000 policy10=2200000 policy6=2300000 policy8=2200000 policy2=1800000  
+14:55:33 run 1: repro: 14:55:33 n1a-p0full-p10cap22 1 rc=0 333s tool_crashes=0 max_temp=48000 
+15:01:45 run 2: repro: 15:01:13 n1a-p0full-p10cap22 1 rc=0 333s tool_crashes=0 max_temp=50000 
+15:07:58 run 3: repro: 15:07:25 n1a-p0full-p10cap22 1 rc=0 333s tool_crashes=0 max_temp=49000 
+15:14:10 run 4: repro: 15:13:39 n1a-p0full-p10cap22 1 rc=0 334s tool_crashes=0 max_temp=49000 
+15:20:23 run 5: repro: 15:19:50 n1a-p0full-p10cap22 1 rc=0 333s tool_crashes=0 max_temp=51000 
+
+## B: cpu0-1 capped at 2.2 GHz, cpu10-11 at full 2.5 GHz -> 1 of 5 pass, 3 kernel panics, 1 tool crash
+15:21:21 pre: policy0=2200000 policy10=2500000 policy6=2300000 policy8=2200000 policy2=1800000  
+15:27:32 run 1: repro: 15:27:00 n1b-p0cap22-p10full 1 rc=0 333s tool_crashes=0 max_temp=50000 
+15:29:27 run 2: board rebooted (crash); repro: 15:27:37 n1b-p0cap22-p10full start 7.3.5-sky1 cpus=0-11 j=6 n=1 maxf=none
+15:31:23 run 3: board rebooted (crash); repro: 15:29:33 n1b-p0cap22-p10full start 7.3.5-sky1 cpus=0-11 j=6 n=1 maxf=none
+15:33:19 run 4: board rebooted (crash); repro: 15:31:29 n1b-p0cap22-p10full start 7.3.5-sky1 cpus=0-11 j=6 n=1 maxf=none
+15:34:32 run 5: repro: 15:34:18 n1b-p0cap22-p10full 1 rc=2 100s tool_crashes=2 max_temp=46000 

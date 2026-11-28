@@ -36,6 +36,7 @@ Kernel lines:
 | Full-load crash: Armbian's stock kernel fails too; missing CPU errata aren't the cause | [2026-11-27](#2026-11-27-rma-evidence-stock-kernel-fails-too-missing-cpu-errata-arent-the-cause) |
 | Full-load crash needs the big A720 pairs above 2.4 GHz; workaround caps only those | [2026-11-27](#2026-11-27-crash-workaround-narrowed-to-the-big-a720-cores) |
 | Full-load crash comes from cpu10-11 alone; workaround now caps only that pair at 2.4 GHz | [2026-11-28](#2026-11-28-crash-workaround-cpu10-11-alone-at-24-ghz) |
+| Public evidence page for a return claim on the cpu10-11 fault | [2026-11-28](#2026-11-28-evidence-page-for-the-cpu10-11-fault) |
 
 ---
 
@@ -873,6 +874,14 @@ not compared):
   there is no hwmon `nvme` (the earlier NVMe logging used nvme-cli). `bench/lib-sensors.sh` now falls back to
   nvme-cli's SMART log, and leaves out a sensor stuck at the warning threshold (the Kingston NV3's Sensor 2 always
   reads 75 C, its WCTEMP). `scripts/02-fetch-patch.sh` enables `NVME_HWMON` on both tracks from the next build.
+
+## 2026-11-28: evidence page for the cpu10-11 fault
+
+- Added `bench/RMA-EVIDENCE.md`: a short case summary of the full-load crash for a warranty or return claim, with
+  four images and their text in `bench/rma-evidence/` (a panic on Armbian's stock 6.18.45 kernel, a hard lockup on
+  three CPUs, heap corruption in the build tools, and an A-B run set where only the cpu10-11 clock changes).
+- Counts as of today: cpu10-11 at 2.4 GHz passed 64 of 65 runs (45 of 45 on 7.3.5, 19 of 20 on 6.18.64), against
+  10 failures in 15 at 2.45 GHz and above. Linked from `bench/CRASH-ANALYSIS.md`.
 
 ## Open items
 
