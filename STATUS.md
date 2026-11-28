@@ -88,9 +88,12 @@ Details: [bench/CRASH-ANALYSIS.md](bench/CRASH-ANALYSIS.md).
       missing A720/A520 errata workarounds. `stress-ng --verify` and memtester pass.
 - [x] Narrowed to the big A720 pairs (cpu0-1 at 2.6 GHz, cpu10-11 at 2.5 GHz): capped at 2.2 or 2.4 GHz, 0 of 5
       runs failed; at full speed, 4 of 5. Points at voltage margin on the big-core rail.
-- [x] Workaround documented (README, INSTALL, release notes): cap `cpu{0,1,10,11}` at 2.2 GHz under such load.
+- [x] Weak pair found: cpu10-11 (policy10, rated 2.5 GHz); cpu0-1 is clean at 2.6 GHz. Edge 2.40-2.45 GHz.
+- [x] Workaround documented (README, INSTALL, release notes, 2026-11-28): cap only `cpu{10,11}` at 2.4 GHz under
+      such load (0 of 20 with everything else at full speed; 45 clean runs at that cap). Replaces the 2.2 GHz cap
+      on all four big cores.
 - [x] Reported to CIX ([cixtech/bios#7](https://github.com/cixtech/bios/issues/7)).
-- [ ] Which big pair is weak; a confidence run at 2.4 GHz; a firmware fix from CIX.
+- [ ] A firmware fix from CIX; decide whether to ship the cap as a boot setting.
 
 ## Phase 2: NPU (working, 2026-11-22)
 Details: [docs/npu.md](docs/npu.md).
